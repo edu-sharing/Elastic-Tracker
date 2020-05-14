@@ -35,7 +35,7 @@ public class Node
     private long id;
     private String nodeRef;
     private long txnId;
-    private SolrApiNodeStatus status;
+    private String status;
     private String tenant;
     private long aclId;
     private String shardPropertyValue;
@@ -64,14 +64,15 @@ public class Node
     {
         this.txnId = txnId;
     }
-    public SolrApiNodeStatus getStatus()
-    {
+
+    public String getStatus() {
         return status;
     }
-    public void setStatus(SolrApiNodeStatus status)
-    {
+
+    public void setStatus(String status) {
         this.status = status;
     }
+
     /**
      * @return the tenant
      */

@@ -1,13 +1,18 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
+import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.core.MediaType;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.*;
 
 @Component
 public class AlfrescoWebscriptClient {
@@ -28,11 +33,29 @@ public class AlfrescoWebscriptClient {
     String URL_NODE_METADATA = "/alfresco/s/api/solr/metadata";
 
 
-    private Client client = ClientBuilder.newClient();
+    private Client client;
 
+
+
+    public AlfrescoWebscriptClient(){
+        Logger logger = Logger.getLogger(getClass().getName());
+        Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
+
+        client = ClientBuilder.newBuilder().register(feature).build();
+    }
 
     public List<Node> getNodes(List<Long> transactionIds ){
-        return null;
+
+        String url = getUrl(URL_NODES_TRANSACTION);
+
+        GetNodeParam p = new GetNodeParam();
+        p.setTxnIds(transactionIds);
+
+        Nodes node = client.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.json(p)).readEntity(Nodes.class);
+
+        return node.getNodes();
     }
 
     public Transactions getTransactions(long fromCommitTime, long toCommitTime, int maxResults, String stores){
