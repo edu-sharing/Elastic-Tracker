@@ -36,7 +36,7 @@ import java.util.Set;
  * 
  * @since 4.0
  */
-public class NodeMetaData
+public class NodeMetadata
 {
     private long id;
     private String nodeRef;
@@ -195,7 +195,7 @@ public class NodeMetaData
     @Override
     public String toString()
     {
-        return "NodeMetaData [id="
+        return "NodeMetadata [id="
                 + id + ", nodeRef=" + nodeRef + ", type=" + type + ", aclId=" + aclId + ", properties=" + properties + ", aspects=" + aspects + ", paths=" + paths
                 + ", parentAssocsCrc=" + parentAssocsCrc + ", parentAssocs=" + parentAssocs + ", childAssocs=" + childAssocs + ", childIds=" + childIds + ", owner=" + owner
                 + ", txnId=" + txnId + ", ancestors=" + ancestors + ", tenantDomain=" + tenantDomain + "]";

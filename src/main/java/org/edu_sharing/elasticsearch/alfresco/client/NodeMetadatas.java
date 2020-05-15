@@ -5,13 +5,13 @@ import java.util.List;
 
 public class NodeMetadatas {
 
-    List<NodeMetaData> nodes = new ArrayList<>();
+    List<NodeMetadata> nodes = new ArrayList<>();
 
-    public List<NodeMetaData> getNodes() {
+    public List<NodeMetadata> getNodes() {
         return nodes;
     }
 
-    public void setNodes(List<NodeMetaData> nodes) {
+    public void setNodes(List<NodeMetadata> nodes) {
         this.nodes = nodes;
     }
 }

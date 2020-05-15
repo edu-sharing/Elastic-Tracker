@@ -32,6 +32,8 @@ public class AlfrescoWebscriptClient {
 
     String URL_NODE_METADATA = "/alfresco/s/api/solr/metadata";
 
+    String URL_ACL_READERS ="/alfresco/s/api/solr/aclsReaders";
+
 
     private Client client;
 
@@ -66,6 +68,42 @@ public class AlfrescoWebscriptClient {
         return nmds;
     }
 
+    public List<NodeToIndex> getNodesToIndex(GetNodeMetadataParam param){
+        NodeMetadatas nmds = getNodeMetadata(param);
+
+        List<Long> acls = new ArrayList<Long>();
+        for(NodeMetadata md : nmds.getNodes()){
+          long aclId =  md.getAclId();
+          acls.add(aclId);
+        }
+        GetReadersParam getReadersParam = new GetReadersParam();
+        getReadersParam.setAclIds(acls);
+        ReadersACL readersACL = this.getReader(getReadersParam);
+
+        List<NodeToIndex> result = new ArrayList<>();
+        for(NodeMetadata node : nmds.getNodes()){
+            for(Reader reader : readersACL.getAclsReaders()){
+                if(node.getAclId() == reader.aclId){
+                    NodeToIndex nti = new NodeToIndex();
+                    nti.setNodeMetadata(node);
+                    nti.setReader(reader);
+                    result.add(nti);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public ReadersACL getReader(GetReadersParam param){
+        String url = getUrl(URL_ACL_READERS);
+        ReadersACL readers = client.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.json(param)).readEntity(ReadersACL.class);
+
+        return readers;
+    }
+
 
     public Transactions getTransactions(long fromCommitTime, long toCommitTime, int maxResults, String stores){
 
@@ -82,6 +120,8 @@ public class AlfrescoWebscriptClient {
 
         return transactions;
     }
+
+
 
 
 
