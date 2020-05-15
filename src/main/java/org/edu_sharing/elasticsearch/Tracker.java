@@ -1,6 +1,7 @@
 package org.edu_sharing.elasticsearch;
 
 import org.edu_sharing.elasticsearch.alfresco.client.*;
+import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,9 @@ public class Tracker {
 
     @Autowired
     private AlfrescoWebscriptClient client;
+
+    @Autowired
+    private ElasticsearchClient elasticClient;
 
     @Scheduled(cron = "*/10 * * * * *")
     public void track(){
@@ -36,7 +40,7 @@ public class Tracker {
 
         NodeMetadatas nmds = client.getNodeMetadata(p);
 
-        for(NodeMetaData nmd : nmds.getNodes()){
+        for(NodeMetadata nmd : nmds.getNodes()){
             System.out.println(nmd);
         }
 
