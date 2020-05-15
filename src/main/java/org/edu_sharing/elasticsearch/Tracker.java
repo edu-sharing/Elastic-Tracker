@@ -1,9 +1,6 @@
 package org.edu_sharing.elasticsearch;
 
-import org.edu_sharing.elasticsearch.alfresco.client.AlfrescoWebscriptClient;
-import org.edu_sharing.elasticsearch.alfresco.client.Node;
-import org.edu_sharing.elasticsearch.alfresco.client.Transaction;
-import org.edu_sharing.elasticsearch.alfresco.client.Transactions;
+import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -28,9 +25,21 @@ public class Tracker {
             transactionIds.add(t.getId());
         }
 
+        List<Long> dbnodeIds = new ArrayList<>();
         for(Node node : client.getNodes(transactionIds)){
             System.out.println("n:"+node);
+            dbnodeIds.add(node.getId());
         }
+
+        GetNodeMetadataParam p = new GetNodeMetadataParam();
+        p.setNodeIds(dbnodeIds);
+
+        NodeMetadatas nmds = client.getNodeMetadata(p);
+
+        for(NodeMetaData nmd : nmds.getNodes()){
+            System.out.println(nmd);
+        }
+
 
         System.out.println("finished:" + transactions.getTransactions().size());
     }

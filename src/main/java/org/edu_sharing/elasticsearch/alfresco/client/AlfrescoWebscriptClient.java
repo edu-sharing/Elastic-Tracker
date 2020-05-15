@@ -58,6 +58,15 @@ public class AlfrescoWebscriptClient {
         return node.getNodes();
     }
 
+    public NodeMetadatas getNodeMetadata(GetNodeMetadataParam param){
+        String url = getUrl(URL_NODE_METADATA);
+        NodeMetadatas nmds = client.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.json(param)).readEntity(NodeMetadatas.class);
+        return nmds;
+    }
+
+
     public Transactions getTransactions(long fromCommitTime, long toCommitTime, int maxResults, String stores){
 
 
@@ -73,6 +82,9 @@ public class AlfrescoWebscriptClient {
 
         return transactions;
     }
+
+
+
 
     private String getUrl(String path){
         return alfrescoProtocol+"://"+alfrescoHost+":"+alfrescoPort+path;
