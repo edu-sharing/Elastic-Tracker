@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,13 +72,13 @@ public class AlfrescoWebscriptClient {
     public List<NodeToIndex> getNodesToIndex(GetNodeMetadataParam param){
         NodeMetadatas nmds = getNodeMetadata(param);
 
-        List<Long> acls = new ArrayList<Long>();
+        LinkedHashSet<Long> acls = new LinkedHashSet<Long>();
         for(NodeMetadata md : nmds.getNodes()){
           long aclId =  md.getAclId();
           acls.add(aclId);
         }
         GetReadersParam getReadersParam = new GetReadersParam();
-        getReadersParam.setAclIds(acls);
+        getReadersParam.setAclIds(new ArrayList<Long>(acls));
         ReadersACL readersACL = this.getReader(getReadersParam);
 
         List<NodeToIndex> result = new ArrayList<>();
@@ -105,14 +106,26 @@ public class AlfrescoWebscriptClient {
     }
 
 
-    public Transactions getTransactions(long fromCommitTime, long toCommitTime, int maxResults, String stores){
+    public Transactions getTransactions(Long minTxnId, Long maxTxnId, Long fromCommitTime, Long toCommitTime, int maxResults, String stores){
 
 
         String url = getUrl(URL_TRANSACTIONS);
 
+        String fromParam = "minTxnId";
+        String toParam = "maxTxnId";
+        Long fromValue = minTxnId;
+        Long toValue = maxTxnId;
+        if(fromCommitTime != null && fromCommitTime > -1){
+            fromParam = "fromCommitTime";
+            toParam = "toCommitTime";
+            fromValue = fromCommitTime;
+            toValue = toCommitTime;
+        }
+
         Transactions transactions = client
-                .target(url).queryParam("fromCommitTime",fromCommitTime)
-                .queryParam("toCommitTime",toCommitTime)
+                .target(url)
+                .queryParam(fromParam,fromValue)
+                .queryParam(toParam,toValue)
                 .queryParam("maxResults",maxResults)
                 .queryParam("stores",stores)
                 .request(MediaType.APPLICATION_JSON)
