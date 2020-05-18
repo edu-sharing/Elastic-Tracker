@@ -25,6 +25,8 @@
  */
 package org.edu_sharing.elasticsearch.alfresco.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,8 @@ public class NodeMetadata
     private List<NamePath> namePaths;
     private long parentAssocsCrc;
     private List<String> parentAssocs;
+
+    @JsonIgnore
     private List<String> childAssocs;
     private List<Long> childIds;
     private String owner;
