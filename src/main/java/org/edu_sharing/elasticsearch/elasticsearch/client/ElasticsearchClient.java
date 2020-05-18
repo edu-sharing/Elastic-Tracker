@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +75,8 @@ public class ElasticsearchClient {
                             builder.field(key, prop.getValue());
                         }
                     }
+
+                    builder.field("aspects", node.getAspects());
 
                 }
                 builder.endObject();
