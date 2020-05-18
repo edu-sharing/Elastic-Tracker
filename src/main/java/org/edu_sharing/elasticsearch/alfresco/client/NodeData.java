@@ -1,8 +1,9 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
-public class NodeToIndex {
+public class NodeData {
     NodeMetadata nodeMetadata;
     Reader reader;
+    Node node;
 
     public NodeMetadata getNodeMetadata() {
         return nodeMetadata;
@@ -18,5 +19,13 @@ public class NodeToIndex {
 
     public void setReader(Reader reader) {
         this.reader = reader;
+    }
+
+    public Node getNode() {
+        return node;
+    }
+
+    public void setNode(Node node) {
+        this.node = node;
     }
 }

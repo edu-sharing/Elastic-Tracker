@@ -69,8 +69,17 @@ public class AlfrescoWebscriptClient {
         return nmds;
     }
 
-    public List<NodeToIndex> getNodesToIndex(GetNodeMetadataParam param){
-        NodeMetadatas nmds = getNodeMetadata(param);
+    public List<NodeData> getNodeData(List<Node> nodes){
+
+        List<Long> dbnodeids = new ArrayList<>();
+        for(Node node : nodes){
+            dbnodeids.add(node.getId());
+        }
+
+        GetNodeMetadataParam getNodeMetadataParam = new GetNodeMetadataParam();
+        getNodeMetadataParam.setNodeIds(dbnodeids);
+
+        NodeMetadatas nmds = getNodeMetadata(getNodeMetadataParam);
 
         LinkedHashSet<Long> acls = new LinkedHashSet<Long>();
         for(NodeMetadata md : nmds.getNodes()){
@@ -81,16 +90,26 @@ public class AlfrescoWebscriptClient {
         getReadersParam.setAclIds(new ArrayList<Long>(acls));
         ReadersACL readersACL = this.getReader(getReadersParam);
 
-        List<NodeToIndex> result = new ArrayList<>();
-        for(NodeMetadata node : nmds.getNodes()){
-            for(Reader reader : readersACL.getAclsReaders()){
-                if(node.getAclId() == reader.aclId){
-                    NodeToIndex nti = new NodeToIndex();
-                    nti.setNodeMetadata(node);
-                    nti.setReader(reader);
-                    result.add(nti);
+        List<NodeData> result = new ArrayList<>();
+        for(NodeMetadata nodeMetadata : nmds.getNodes()){
+
+            Node node = null;
+
+            for(Node n : nodes){
+                if(n.getId() == nodeMetadata.getId()){
+                    node = n;
                 }
             }
+
+            for(Reader reader : readersACL.getAclsReaders())
+                if (nodeMetadata.getAclId() == reader.aclId) {
+                    NodeData nodeData = new NodeData();
+                    nodeData.setNodeMetadata(nodeMetadata);
+                    nodeData.setReader(reader);
+                    nodeData.setNode(node);
+
+                    result.add(nodeData);
+                }
         }
 
         return result;

@@ -6,6 +6,8 @@ import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadatas;
 import org.elasticsearch.action.DocWriteResponse;
+import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
@@ -38,15 +40,10 @@ public class ElasticsearchClient {
 
     public static String INDEX_WORKSPACE = "workspace";
 
-    public void index(NodeMetadatas nodes){
-        RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(
-                        new HttpHost(elasticHost, elasticPort, elasticProtocol)
-                        //,new HttpHost("localhost", 9201, "http")
-                ));
+    public void index(List<NodeMetadata> nodes) throws IOException{
+        RestHighLevelClient client = getClient();
 
-        for(NodeMetadata node: nodes.getNodes()){
-            try {
+        for(NodeMetadata node: nodes) {
                 XContentBuilder builder = XContentFactory.jsonBuilder();
                 builder.startObject();
                 {
@@ -64,6 +61,7 @@ public class ElasticsearchClient {
                             builder.field(prop.getKey(), prop.getValue());
                         }
                     }
+                    builder.endObject();
                 }
                 builder.endObject();
 
@@ -91,16 +89,49 @@ public class ElasticsearchClient {
                     }
                 }
 
-            } catch (IOException e) {
-                e.printStackTrace();
+
+        }
+
+        client.close();
+
+    }
+
+
+
+    public void delete(List<NodeMetadata> nodeMetadatas) throws IOException {
+        RestHighLevelClient client = getClient();
+
+        for(NodeMetadata nmd : nodeMetadatas){
+            DeleteRequest request = new DeleteRequest(
+                    INDEX_WORKSPACE,
+                    Long.toString(nmd.getId()));
+            DeleteResponse deleteResponse = client.delete(
+                    request, RequestOptions.DEFAULT);
+
+            String index = deleteResponse.getIndex();
+            String id = deleteResponse.getId();
+            long version = deleteResponse.getVersion();
+            ReplicationResponse.ShardInfo shardInfo = deleteResponse.getShardInfo();
+            if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
+                logger.error("shardInfo.getTotal() != shardInfo.getSuccessful() index:" + index +" id:"+id + " version:"+version);
+            }
+            if (shardInfo.getFailed() > 0) {
+                for (ReplicationResponse.ShardInfo.Failure failure :
+                        shardInfo.getFailures()) {
+                    String reason = failure.reason();
+                    logger.error(reason + "index:" + index +" id:"+id +" version:"+version);
+                }
             }
         }
 
-
-        try {
-            client.close();
-        } catch (IOException e) {
-            logger.error(e);
-        }
+        client.close();
     }
+
+    RestHighLevelClient getClient(){
+      return new RestHighLevelClient(
+                RestClient.builder(
+                        new HttpHost(elasticHost, elasticPort, elasticProtocol)
+                        //,new HttpHost("localhost", 9201, "http")
+                ));
+    };
 }

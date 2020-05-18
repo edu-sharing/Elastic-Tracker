@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -22,13 +23,13 @@ public class Tracker {
     @Autowired
     private ElasticsearchClient elasticClient;
 
-    long lastIndexTime = -1;
+    long lastFromCommitTime = -1;
     long lastTransactionId = -1;
 
     final static int maxResults = 50;
 
     //in ms
-    final static int nextTimeStep = 3600000;
+    final static int nextTimeStep = 36000000;
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
@@ -36,70 +37,87 @@ public class Tracker {
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
-        logger.info("starting lastTransactionId:" +lastTransactionId+ " lastIndexTime:" + lastIndexTime +" " +  new Date(lastIndexTime));
-        //Transactions transactions = client.getTransactions(1589452972235L,1589456572235L,2000,"workspace://SpacesStore");
+        logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
-        long toCommitTime = lastIndexTime + Tracker.nextTimeStep;
-        Transactions transactions = (lastIndexTime < 1)
+        long toCommitTime = lastFromCommitTime + Tracker.nextTimeStep;
+        Transactions transactions = (lastFromCommitTime < 1)
                 ? client.getTransactions(0L,2000L,null,null, 1, Tracker.storeWorkspace)
-                : client.getTransactions(null, null,lastIndexTime,toCommitTime, Tracker.maxResults, Tracker.storeWorkspace );
-
+                : client.getTransactions(null, null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace );
 
 
         if(transactions.getTransactions().size() == 0){
 
-            logger.info("start   : step forward in time to find next transaction from:" + lastIndexTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
+            if(toCommitTime > transactions.getMaxTxnCommitTime()){
+                logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
+
+                this.lastFromCommitTime = toCommitTime;
+                return;
+            }
+
+            logger.info("start   : step forward in time to find next transaction from:" + lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
             do{
 
-                lastIndexTime += Tracker.nextTimeStep;
-                toCommitTime = lastIndexTime + Tracker.nextTimeStep;
-                transactions = client.getTransactions(null,null,lastIndexTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace);
+                lastFromCommitTime += Tracker.nextTimeStep;
+                toCommitTime = lastFromCommitTime + Tracker.nextTimeStep;
+                transactions = client.getTransactions(null,null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace);
             }while(transactions.getTransactions().size() == 0 && toCommitTime < transactions.getMaxTxnCommitTime());
-            logger.info("finished: step forward in time from:"+ lastIndexTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
+            logger.info("finished: step forward in time from:"+ lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
 
             if(transactions.getTransactions().size() == 0) {
-                logger.info("no new transactions found lastTransactionId:" + lastTransactionId + " lastIndexTime:" + lastIndexTime);
+                logger.info("no new transactions found lastTransactionId:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
                 return;
             }
         }
 
         Transaction first = transactions.getTransactions().get(0);
         Transaction last = transactions.getTransactions().get(transactions.getTransactions().size() -1);
-        logger.info("first:" + first.getId() +" " + new Date(first.getCommitTimeMs()) +" last:"+last.getId() + " " + new Date(last.getCommitTimeMs()));
 
+        if(lastFromCommitTime < 1) {
+            this.lastFromCommitTime = last.getCommitTimeMs();
+        }else{
+            this.lastFromCommitTime = toCommitTime;
+        }
+        this.lastTransactionId = last.getId();
 
+        /**
+         * add transactionsIds as getNodes Param
+         */
         List<Long> transactionIds = new ArrayList<>();
         for(Transaction t : transactions.getTransactions()){
             transactionIds.add(t.getId());
         }
 
-        List<Long> dbnodeIds = new ArrayList<>();
-        for(Node node : client.getNodes(transactionIds)){
-            //logger.info("n:"+node);
-            dbnodeIds.add(node.getId());
-        }
-       // logger.info("found nodes:"+dbnodeIds.size() +" " + Arrays.toString(dbnodeIds.toArray()));
+        /**
+         * get nodes
+         */
+        List<Node> nodes =  client.getNodes(transactionIds);
 
-        GetNodeMetadataParam p = new GetNodeMetadataParam();
-        p.setNodeIds(dbnodeIds);
-
+        /**
+         * get node metadata
+         */
         try {
-            List<NodeToIndex> nodesToIndex = client.getNodesToIndex(p);
-            /*for(NodeToIndex nmd : nodesToIndex){
-            logger.info(nmd.getNodeMetadata().getType() + " " + nmd.getNodeMetadata().getNodeRef() +" Reader:" + Arrays.toString(nmd.getReader().getReaders().toArray()));
-            }*/
+            List<NodeData> nodeData = client.getNodeData(nodes);
+
+            List<NodeMetadata> toDelete = new ArrayList<NodeMetadata>();
+            List<NodeMetadata> toIndex = new ArrayList<NodeMetadata>();
+            for(NodeData data : nodeData){
+                if(data.getNode().getStatus().equals("d")){
+                    toDelete.add(data.getNodeMetadata());
+                }else {
+                    toIndex.add(data.getNodeMetadata());
+                }
+            }
+            elasticClient.delete(toDelete);
+            elasticClient.index(toIndex);
+
         }catch(javax.ws.rs.ProcessingException e){
-            logger.error("error unmarschelling nodes: " + Arrays.toString(p.getNodeIds().toArray()),e);
+            logger.error("error unmarshalling NodeMetadata: " + Arrays.toString(nodes.toArray()),e);
+        }catch(IOException e){
+            logger.error(e.getMessage(),e);
         }
 
-
-
-        if(lastIndexTime < 1) {
-            this.lastIndexTime = last.getCommitTimeMs();
-        }else{
-            this.lastIndexTime = toCommitTime;
-        }
-        this.lastTransactionId = last.getId();
-        logger.info("finished lastTransactionId:" + this.lastTransactionId +" transactions:" + Arrays.toString(transactionIds.toArray()) +" size:" + transactions.getTransactions().size() + " dbnodeIds:"+dbnodeIds.size());
+        logger.info("finished lastTransactionId:" + this.lastTransactionId +
+                " transactions:" + Arrays.toString(transactionIds.toArray()) +
+                " nodes:" + nodes.size());
     }
 }
