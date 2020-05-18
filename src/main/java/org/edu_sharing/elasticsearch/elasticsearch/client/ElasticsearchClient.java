@@ -59,6 +59,7 @@ public class ElasticsearchClient {
                     builder.field("dbid",node.getId());
                     builder.field("nodeRef", node.getNodeRef());
                     builder.field("owner", node.getOwner());
+                    builder.field("type",node.getType());
 
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
 
@@ -157,6 +158,7 @@ public class ElasticsearchClient {
                     builder.startObject("dbid").field("type", "long").endObject();
                     builder.startObject("nodeRef").field("type", "text").endObject();
                     builder.startObject("owner").field("type", "text").endObject();
+                    builder.startObject("type").field("type", "text").endObject();
                     //builder.startObject("name").field("type", "text").endObject();
                     //builder.startObject("keywords").field("type", "keyword").endObject();
                 }
