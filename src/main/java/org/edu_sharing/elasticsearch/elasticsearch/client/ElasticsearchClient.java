@@ -3,9 +3,11 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.edu_sharing.elasticsearch.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadatas;
 import org.elasticsearch.action.DocWriteResponse;
+
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -14,6 +16,7 @@ import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +26,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 @Component
 public class ElasticsearchClient {
@@ -40,11 +45,13 @@ public class ElasticsearchClient {
 
     public static String INDEX_WORKSPACE = "workspace";
 
+    public static String TYPE = "node";
+
     public void index(List<NodeMetadata> nodes) throws IOException{
         RestHighLevelClient client = getClient();
 
         for(NodeMetadata node: nodes) {
-                XContentBuilder builder = XContentFactory.jsonBuilder();
+                XContentBuilder builder = jsonBuilder();
                 builder.startObject();
                 {
                     builder.field("aclId",  node.getAclId());
@@ -53,15 +60,20 @@ public class ElasticsearchClient {
                     builder.field("nodeRef", node.getNodeRef());
                     builder.field("owner", node.getOwner());
 
-                    builder = builder.startObject("properties");
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
+
+                        String key = Constants.getValidLocalName(prop.getKey());
+                        if(key == null){
+                            logger.error("unknown namespace: " + prop.getKey());
+                            continue;
+                        }
                         if(prop.getValue() instanceof List){
-                            builder.array(prop.getKey(), prop.getValue());
+                            builder.array(key, prop.getValue());
                         }else{
-                            builder.field(prop.getKey(), prop.getValue());
+                            builder.field(key, prop.getValue());
                         }
                     }
-                    builder.endObject();
+
                 }
                 builder.endObject();
 
@@ -125,6 +137,41 @@ public class ElasticsearchClient {
         }
 
         client.close();
+    }
+
+    public void createIndex() throws IOException {
+        try {
+            RestHighLevelClient client = getClient();
+
+
+            CreateIndexRequest indexRequest = new CreateIndexRequest(INDEX_WORKSPACE);
+
+            XContentBuilder builder = XContentFactory.jsonBuilder();
+            builder.startObject();
+            {
+
+                builder.startObject("properties");
+                {
+                    builder.startObject("aclId").field("type", "long").endObject();
+                    builder.startObject("txnId").field("type", "long").endObject();
+                    builder.startObject("dbid").field("type", "long").endObject();
+                    builder.startObject("nodeRef").field("type", "text").endObject();
+                    builder.startObject("owner").field("type", "text").endObject();
+                    //builder.startObject("name").field("type", "text").endObject();
+                    //builder.startObject("keywords").field("type", "keyword").endObject();
+                }
+                builder.endObject();
+            }
+            builder.endObject();
+
+            indexRequest.mapping(builder);
+
+
+
+        }catch(Exception e) {
+            // index already exists
+            // throw new RuntimeException("Elastic search init failed",e);
+        }
     }
 
     RestHighLevelClient getClient(){
