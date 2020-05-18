@@ -49,8 +49,9 @@ public class Tracker {
 
             if(toCommitTime > transactions.getMaxTxnCommitTime()){
                 logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
-
-                this.lastFromCommitTime = toCommitTime;
+                //+1 to prevent repeating the last transaction over and over
+                //not longer necessary when we remember last transaction id in idx
+                this.lastFromCommitTime = transactions.getMaxTxnCommitTime() + 1;
                 return;
             }
 
