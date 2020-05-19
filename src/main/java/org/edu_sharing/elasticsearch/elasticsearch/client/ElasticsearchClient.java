@@ -236,6 +236,7 @@ public class ElasticsearchClient {
                     builder.startObject("nodeRef").field("type", "text").endObject();
                     builder.startObject("owner").field("type", "text").endObject();
                     builder.startObject("type").field("type", "text").endObject();
+                    builder.startObject("readers").field("type", "text").endObject();
                     //builder.startObject("name").field("type", "text").endObject();
                     //builder.startObject("keywords").field("type", "keyword").endObject();
                 }
