@@ -35,8 +35,8 @@ public class Tracker {
 
     final static int maxResults = 50;
 
-    //in ms
-    final static int nextTimeStep = 36000000;
+    @Value("${tracker.timestep:36000000}")
+    int nextTimeStep;
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
@@ -61,7 +61,7 @@ public class Tracker {
     public void track(){
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
-        long toCommitTime = lastFromCommitTime + Tracker.nextTimeStep;
+        long toCommitTime = lastFromCommitTime + nextTimeStep;
         Transactions transactions = (lastFromCommitTime < 1)
                 ? client.getTransactions(0L,2000L,null,null, 1, Tracker.storeWorkspace)
                 : client.getTransactions(null, null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace );
@@ -80,8 +80,8 @@ public class Tracker {
             logger.info("start   : step forward in time to find next transaction from:" + lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
             do{
 
-                lastFromCommitTime += Tracker.nextTimeStep;
-                toCommitTime = lastFromCommitTime + Tracker.nextTimeStep;
+                lastFromCommitTime += nextTimeStep;
+                toCommitTime = lastFromCommitTime + nextTimeStep;
                 transactions = client.getTransactions(null,null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace);
             }while(transactions.getTransactions().size() == 0 && toCommitTime < transactions.getMaxTxnCommitTime());
             logger.info("finished: step forward in time from:"+ lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
