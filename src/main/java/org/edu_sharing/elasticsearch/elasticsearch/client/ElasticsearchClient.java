@@ -4,6 +4,7 @@ import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.Constants;
+import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadatas;
 import org.elasticsearch.action.DocWriteResponse;
@@ -66,10 +67,11 @@ public class ElasticsearchClient {
         client.close();
     }
 
-    public void index(List<NodeMetadata> nodes) throws IOException{
+    public void index(List<NodeData> nodes) throws IOException{
         RestHighLevelClient client = getClient();
 
-        for(NodeMetadata node: nodes) {
+        for(NodeData nodeData: nodes) {
+            NodeMetadata node = nodeData.getNodeMetadata();
                 XContentBuilder builder = jsonBuilder();
                 builder.startObject();
                 {
@@ -79,6 +81,7 @@ public class ElasticsearchClient {
                     builder.field("nodeRef", node.getNodeRef());
                     builder.field("owner", node.getOwner());
                     builder.field("type",node.getType());
+                    builder.field("readers",nodeData.getReader().getReaders());
 
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
 
@@ -184,10 +187,11 @@ public class ElasticsearchClient {
 
 
 
-    public void delete(List<NodeMetadata> nodeMetadatas) throws IOException {
+    public void delete(List<NodeData> nodeDatas) throws IOException {
         RestHighLevelClient client = getClient();
 
-        for(NodeMetadata nmd : nodeMetadatas){
+        for(NodeData nodeData : nodeDatas){
+            NodeMetadata nmd = nodeData.getNodeMetadata();
             DeleteRequest request = new DeleteRequest(
                     INDEX_WORKSPACE,
                     Long.toString(nmd.getId()));

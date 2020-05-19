@@ -117,13 +117,13 @@ public class Tracker {
         try {
             List<NodeData> nodeData = client.getNodeData(nodes);
 
-            List<NodeMetadata> toDelete = new ArrayList<NodeMetadata>();
-            List<NodeMetadata> toIndex = new ArrayList<NodeMetadata>();
+            List<NodeData> toDelete = new ArrayList<NodeData>();
+            List<NodeData> toIndex = new ArrayList<NodeData>();
             for(NodeData data : nodeData){
                 if(data.getNode().getStatus().equals("d")){
-                    toDelete.add(data.getNodeMetadata());
+                    toDelete.add(data);
                 }else {
-                    toIndex.add(data.getNodeMetadata());
+                    toIndex.add(data);
                 }
             }
             elasticClient.delete(toDelete);
