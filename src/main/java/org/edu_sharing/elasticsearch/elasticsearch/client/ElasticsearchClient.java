@@ -10,6 +10,8 @@ import org.elasticsearch.action.DocWriteResponse;
 
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
+import org.elasticsearch.action.get.GetRequest;
+import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
@@ -17,11 +19,13 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
+import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -46,7 +50,21 @@ public class ElasticsearchClient {
 
     public static String INDEX_WORKSPACE = "workspace";
 
+    public static String INDEX_TRANSACTIONS = "transactions";
+
     public static String TYPE = "node";
+
+
+    @PostConstruct
+    public void init() throws IOException {
+        GetIndexRequest request = new GetIndexRequest(INDEX_TRANSACTIONS);
+        RestHighLevelClient client = getClient();
+        if(!client.indices().exists(request,RequestOptions.DEFAULT)){
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX_TRANSACTIONS);
+            client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+        }
+        client.close();
+    }
 
     public void index(List<NodeMetadata> nodes) throws IOException{
         RestHighLevelClient client = getClient();
@@ -110,6 +128,58 @@ public class ElasticsearchClient {
 
         client.close();
 
+    }
+
+    public void setTransaction(long txnCommitTime, long transactionId) throws IOException {
+        RestHighLevelClient client = getClient();
+        XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        {
+            builder.field("txnId", transactionId);
+            builder.field("txnCommitTime",txnCommitTime);
+        }
+        builder.endObject();
+
+        IndexRequest indexRequest = new IndexRequest(INDEX_TRANSACTIONS)
+                .id("1").source(builder);
+
+        IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+        String index = indexResponse.getIndex();
+        String id = indexResponse.getId();
+        if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
+            logger.info("created tx in elastic:" + transactionId +" txnCommitTime:"+txnCommitTime);
+        } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
+            logger.info("updated tx in elastic:" + transactionId +" txnCommitTime:"+txnCommitTime);
+        }
+        ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
+        if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
+            logger.error("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
+        }
+        if (shardInfo.getFailed() > 0) {
+            for (ReplicationResponse.ShardInfo.Failure failure :
+                    shardInfo.getFailures()) {
+                String reason = failure.reason();
+                logger.error(failure.nodeId() +" reason:"+reason);
+            }
+        }
+        client.close();
+    }
+
+    public Tx getTransaction() throws IOException {
+        RestHighLevelClient client = getClient();
+        GetRequest getRequest = new GetRequest(INDEX_TRANSACTIONS,"1");
+        GetResponse resp = client.get(getRequest,RequestOptions.DEFAULT);
+
+        Tx transaction = null;
+        if(resp.isExists()) {
+
+            transaction = new Tx();
+            transaction.setTxnCommitTime((Long) resp.getSource().get("txnCommitTime"));
+            transaction.setTxnId((Integer) resp.getSource().get("txnId"));
+        }
+
+        client.close();
+        return transaction;
     }
 
 
@@ -186,4 +256,5 @@ public class ElasticsearchClient {
                         //,new HttpHost("localhost", 9201, "http")
                 ));
     };
+
 }

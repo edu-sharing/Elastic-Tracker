@@ -4,10 +4,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
+import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +37,21 @@ public class Tracker {
     final static String storeWorkspace = "workspace://SpacesStore";
 
     Logger logger = LogManager.getLogger(Tracker.class);
+
+    @PostConstruct
+    public void init()  throws IOException{
+        Tx txn = null;
+        try {
+            txn = elasticClient.getTransaction();
+            if(txn != null){
+                lastFromCommitTime = txn.getTxnCommitTime();
+                logger.info("got last transaction from index txnCommitTime:" + txn.getTxnCommitTime() +" txnId" +txn.getTxnId());
+            }
+        } catch (IOException e) {
+            logger.error("problems reaching elastic search server");
+            throw e;
+        }
+    }
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
@@ -111,11 +129,14 @@ public class Tracker {
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
 
+            //remember for the next start of tracker
+            elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
         }catch(javax.ws.rs.ProcessingException e){
             logger.error("error unmarshalling NodeMetadata: " + Arrays.toString(nodes.toArray()),e);
         }catch(IOException e){
             logger.error(e.getMessage(),e);
         }
+
 
         logger.info("finished lastTransactionId:" + this.lastTransactionId +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
