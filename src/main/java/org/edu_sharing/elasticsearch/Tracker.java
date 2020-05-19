@@ -6,6 +6,7 @@ import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,9 @@ public class Tracker {
 
     @Autowired
     private ElasticsearchClient elasticClient;
+
+    @Value("${allowed.types}")
+    String allowedTypes;
 
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
@@ -120,6 +124,16 @@ public class Tracker {
             List<NodeData> toDelete = new ArrayList<NodeData>();
             List<NodeData> toIndex = new ArrayList<NodeData>();
             for(NodeData data : nodeData){
+
+                if(allowedTypes != null && !allowedTypes.trim().equals("")){
+                    String[] allowedTypesArray = allowedTypes.split(",");
+                    String type = data.getNodeMetadata().getType();
+                    if(!Arrays.asList(allowedTypesArray).contains(type)){
+                        logger.info("ignoring type:" + type);
+                        continue;
+                    }
+                }
+
                 if(data.getNode().getStatus().equals("d")){
                     toDelete.add(data);
                 }else {
