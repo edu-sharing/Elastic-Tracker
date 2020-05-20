@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class Tracker {
@@ -127,7 +128,11 @@ public class Tracker {
          * get nodes
          */
         List<Node> nodes =  client.getNodes(transactionIds);
-
+        //filter non workspace://SpacesStore
+        nodes = nodes
+                .stream()
+                .filter(n -> n.getNodeRef().startsWith("workspace://SpacesStore/"))
+                .collect(Collectors.toList());
         /**
          * get node metadata
          */
