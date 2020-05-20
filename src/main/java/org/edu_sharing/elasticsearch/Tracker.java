@@ -133,6 +133,11 @@ public class Tracker {
                 .stream()
                 .filter(n -> n.getNodeRef().startsWith("workspace://SpacesStore/"))
                 .collect(Collectors.toList());
+
+        if(nodes.size() == 0){
+            return;
+        }
+
         /**
          * get node metadata
          */
