@@ -71,13 +71,6 @@ public class EduSharingClient {
 
     public void translateValuespaceProps(NodeData data){
 
-        for(String v : this.valuespaceProps){
-            System.out.println("valueSpaceProp:" + v);
-        }
-        for(String v : this.valuespaceLanguages){
-            System.out.println("valuespaceLanguage:" + v);
-        }
-
         Map<String, Serializable> properties = data.getNodeMetadata().getProperties();
 
         String mds = (String)data.getNodeMetadata().getProperties().get(Constants.CM_PROP_EDUMETADATASET);
@@ -138,7 +131,7 @@ public class EduSharingClient {
         ValuespaceEntries entries = getValuespaceFromCache(mds, language, property);
 
         if(entries != null){
-            logger.info("got valuespace entries from cache");
+            logger.debug("got valuespace entries from cache");
             return entries;
         }
 
