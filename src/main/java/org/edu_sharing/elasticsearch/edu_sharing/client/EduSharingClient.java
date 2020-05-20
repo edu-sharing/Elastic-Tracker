@@ -1,6 +1,8 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
 import org.apache.logging.log4j.LogManager;
+import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
+import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,8 +14,8 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.Serializable;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,11 +37,17 @@ public class EduSharingClient {
     @Value("${alfresco.password}")
     String alfrescoPassword;
 
+    @Value("${valuespace.props}")
+    String[] valuespaceProps;
+
+    @Value("${valuespace.languages}")
+    String[] valuespaceLanguages;
+
+
     private Client client;
 
     String URL_MDS_VALUES = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}/values";
 
-    //map<mds,map<language,map<property,valuespacentries>>>
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
@@ -50,14 +58,82 @@ public class EduSharingClient {
         client = ClientBuilder.newBuilder().register(feature).build();
     }
 
+    public String translate(String mds, String language, String property, String key){
+        ValuespaceEntries entries = getValuespace(mds,language,property);
+        String result = null;
+        for(ValuespaceEntry entry : entries.getValues()){
+            if(entry.getKey().equals(key)){
+                result = entry.getDisplayString();
+            }
+        }
+        return result;
+    }
+
+    public void translateValuespaceProps(NodeData data){
+
+        for(String v : this.valuespaceProps){
+            System.out.println("valueSpaceProp:" + v);
+        }
+        for(String v : this.valuespaceLanguages){
+            System.out.println("valuespaceLanguage:" + v);
+        }
+
+        Map<String, Serializable> properties = data.getNodeMetadata().getProperties();
+
+        String mds = (String)data.getNodeMetadata().getProperties().get(Constants.CM_PROP_EDUMETADATASET);
+        if(mds == null) mds = "default";
+
+        Map<String,Serializable> translatedProps = new HashMap<>();
+        for(Map.Entry<String, Serializable> prop : properties.entrySet()){
+            String key = Constants.getValidLocalName(prop.getKey());
+            if(key == null){
+                logger.error("unknown namespace: " + prop.getKey());
+                continue;
+            }
+
+            if(Arrays.asList(valuespaceProps).contains(key)){
+                for(String language : valuespaceLanguages) {
+                    Serializable translated = null;
+
+                    if(prop.getValue() == null) continue;
+
+                    if (prop.getValue() instanceof List) {
+                        ArrayList<String> translatedList = new ArrayList<>();
+                        for (String value : (List<String>) prop.getValue()) {
+                           String translatedVal =  translate(mds,language,key,value);
+                           if(translatedVal != null && !translatedVal.trim().equals("")){
+                               translatedList.add(translatedVal);
+                           }
+                        }
+                        if(translatedList.size()>0){
+                            translated = translatedList;
+                        }
+                    } else {
+                        String translatedVal =  translate(mds,language,key,prop.getValue().toString());
+                        if(translatedVal != null){
+                            translated = translatedVal;
+                        }
+                    }
+                    translatedProps.put(prop.getKey() + "_" + language, translated);
+                }
+            }
+        }
+        if(translatedProps.size() > 0){
+            properties.putAll(translatedProps);
+        }
+
+
+
+    }
+
     /**
      *
+     * @param mds
      * @param language de-de, en-en
      * @param property
-     * @param mds
      * @return
      */
-    public ValuespaceEntries getValuespace(String language, String property, String mds){
+    public ValuespaceEntries getValuespace(String mds, String language, String property ){
 
         ValuespaceEntries entries = getValuespaceFromCache(mds, language, property);
 

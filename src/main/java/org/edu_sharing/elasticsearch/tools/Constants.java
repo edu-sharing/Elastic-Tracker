@@ -30,6 +30,8 @@ public class Constants {
 
     public final static String NAMESPACE_SHORT_EXIF = "exif";
 
+    public final static String CM_PROP_EDUMETADATASET = "{" + NAMESPACE_CM + "}edu_metadataset";
+
     private static HashMap<String, String> nameSpaceMap = null;
     /**
      * @return <namespace,localnamespace>

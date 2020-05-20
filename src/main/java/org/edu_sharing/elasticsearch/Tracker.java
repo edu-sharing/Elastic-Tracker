@@ -3,6 +3,9 @@ package org.edu_sharing.elasticsearch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
+import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.edu_sharing.client.ValuespaceEntries;
+import org.edu_sharing.elasticsearch.edu_sharing.client.ValuespaceEntry;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,9 @@ public class Tracker {
 
     @Autowired
     private ElasticsearchClient elasticClient;
+
+    @Autowired
+    private EduSharingClient eduSharingClient;
 
     @Value("${allowed.types}")
     String allowedTypes;
@@ -59,6 +65,13 @@ public class Tracker {
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
+        /*ValuespaceEntries entries = eduSharingClient.getValuespace("de-de","ccm:educationallearningresourcetype","default");
+        for(ValuespaceEntry e : entries.getValues()){
+            System.out.println(e.getKey() +" " +e.getDisplayString());
+        }
+        if(true)return;*/
+
+
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
         long toCommitTime = lastFromCommitTime + nextTimeStep;
@@ -137,6 +150,7 @@ public class Tracker {
                 if(data.getNode().getStatus().equals("d")){
                     toDelete.add(data);
                 }else {
+                    eduSharingClient.translateValuespaceProps(data);
                     toIndex.add(data);
                 }
             }
