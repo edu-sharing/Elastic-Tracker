@@ -1,4 +1,4 @@
-package org.edu_sharing.elasticsearch;
+package org.edu_sharing.elasticsearch.tools;
 
 import java.util.HashMap;
 import java.util.Map;
