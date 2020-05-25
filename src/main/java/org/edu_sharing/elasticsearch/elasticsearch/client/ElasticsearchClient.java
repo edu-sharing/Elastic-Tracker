@@ -28,7 +28,9 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -111,6 +113,13 @@ public class ElasticsearchClient {
                                 }
                             }
                         }
+                        if("cm:modified".equals(key) || "cm:created".equals(key)){
+
+                            if(prop.getValue() != null) {
+                                value = Date.from(Instant.parse((String) prop.getValue())).getTime();
+                            }
+                        }
+
                         if(value != null) {
                             builder.field(key, value);
                         }
