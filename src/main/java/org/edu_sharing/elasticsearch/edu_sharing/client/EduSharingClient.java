@@ -76,7 +76,6 @@ public class EduSharingClient {
         String mds = (String)data.getNodeMetadata().getProperties().get(Constants.CM_PROP_EDUMETADATASET);
         if(mds == null) mds = "default";
 
-        Map<String,Serializable> translatedProps = new HashMap<>();
         for(Map.Entry<String, Serializable> prop : properties.entrySet()){
             String key = Constants.getValidLocalName(prop.getKey());
             if(key == null){
@@ -107,12 +106,19 @@ public class EduSharingClient {
                             translated = translatedVal;
                         }
                     }
-                    translatedProps.put(prop.getKey() + "_" + language, translated);
+
+                    Map<String, List<String>> valuespacesForLanguage = data.getValueSpaces().get(language);
+                    if(valuespacesForLanguage == null){
+                        valuespacesForLanguage = new HashMap<>();
+                        data.getValueSpaces().put(language,valuespacesForLanguage);
+                    }
+                    if(translated instanceof List){
+                        valuespacesForLanguage.put(prop.getKey(),(List)translated);
+                    }else{
+                        valuespacesForLanguage.put(prop.getKey(),Arrays.asList(new String[]{(String)translated}));
+                    }
                 }
             }
-        }
-        if(translatedProps.size() > 0){
-            properties.putAll(translatedProps);
         }
 
 

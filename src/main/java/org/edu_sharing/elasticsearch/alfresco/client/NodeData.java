@@ -1,9 +1,14 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class NodeData {
     NodeMetadata nodeMetadata;
     Reader reader;
     Node node;
+    Map<String, Map<String, List<String>>> valueSpaces = new HashMap<>();
 
     public NodeMetadata getNodeMetadata() {
         return nodeMetadata;
@@ -27,5 +32,13 @@ public class NodeData {
 
     public void setNode(Node node) {
         this.node = node;
+    }
+
+    public Map<String, Map<String, List<String>>> getValueSpaces() {
+        return valueSpaces;
+    }
+
+    public void setValueSpaces(Map<String, Map<String, List<String>>> valueSpaces) {
+        this.valueSpaces = valueSpaces;
     }
 }

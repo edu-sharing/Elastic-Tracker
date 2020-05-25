@@ -88,10 +88,27 @@ public class ElasticsearchClient {
                             .field("id",id)
                     .endObject();
 
-
-
                     builder.field("owner", node.getOwner());
                     builder.field("type",node.getType());
+
+                    //valuespaces
+                    if(nodeData.getValueSpaces().size() > 0){
+                        builder.startObject("i18n");
+                        for(Map.Entry<String,Map<String,List<String>>> entry : nodeData.getValueSpaces().entrySet())      {
+                            builder.startObject(entry.getKey());
+                            for(Map.Entry<String,List<String>> valuespace : entry.getValue().entrySet() ){
+
+                                String key = Constants.getValidLocalName(valuespace.getKey());
+                                if(key != null) {
+                                    builder.field(key, valuespace.getValue());
+                                }else{
+                                    logger.error("unknown valuespace property: " + valuespace.getKey());
+                                }
+                            }
+                            builder.endObject();
+                        }
+                        builder.endObject();
+                    }
 
                     if(node.getPaths() != null && node.getPaths().size() > 0){
                         String[] pathEle = node.getPaths().get(0).getApath().split("/");
