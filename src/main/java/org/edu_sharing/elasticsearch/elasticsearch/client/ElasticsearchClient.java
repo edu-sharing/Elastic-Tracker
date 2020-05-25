@@ -95,7 +95,8 @@ public class ElasticsearchClient {
                     if(nodeData.getValueSpaces().size() > 0){
                         builder.startObject("i18n");
                         for(Map.Entry<String,Map<String,List<String>>> entry : nodeData.getValueSpaces().entrySet())      {
-                            builder.startObject(entry.getKey());
+                            String language = entry.getKey().split("-")[0];
+                            builder.startObject(language);
                             for(Map.Entry<String,List<String>> valuespace : entry.getValue().entrySet() ){
 
                                 String key = Constants.getValidLocalName(valuespace.getKey());
