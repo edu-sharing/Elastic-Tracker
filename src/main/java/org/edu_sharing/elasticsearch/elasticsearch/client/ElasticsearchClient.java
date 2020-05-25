@@ -88,11 +88,9 @@ public class ElasticsearchClient {
                             logger.error("unknown namespace: " + prop.getKey());
                             continue;
                         }
-                        if(prop.getValue() instanceof List){
-                            builder.array(key, prop.getValue());
-                        }else{
-                            builder.field(key, prop.getValue());
-                        }
+
+                        builder.field(key, prop.getValue());
+
                     }
 
                     builder.field("aspects", node.getAspects());
