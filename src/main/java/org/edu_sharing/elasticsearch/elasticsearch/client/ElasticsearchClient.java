@@ -3,6 +3,7 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.edu_sharing.elasticsearch.alfresco.client.Path;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
@@ -29,10 +30,7 @@ import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
@@ -79,11 +77,32 @@ public class ElasticsearchClient {
                     builder.field("aclId",  node.getAclId());
                     builder.field("txnId",node.getTxnId());
                     builder.field("dbid",node.getId());
-                    builder.field("nodeRef", node.getNodeRef());
+                    String storeRefProtocol = node.getNodeRef().split("://")[0];
+                    String storeRefIdentifier = node.getNodeRef().split("://")[1].split("/")[0];
+                    String id = node.getNodeRef().split("://")[1].split("/")[1];
+                    builder.startObject("nodeRef")
+                            .startObject("storeRef")
+                                .field("protocol",storeRefProtocol)
+                                .field("identifier",storeRefIdentifier)
+                            .endObject()
+                            .field("id",id)
+                    .endObject();
+
+
+
                     builder.field("owner", node.getOwner());
                     builder.field("type",node.getType());
-                    builder.field("readers",nodeData.getReader().getReaders());
 
+                    if(node.getPaths() != null && node.getPaths().size() > 0){
+                        String[] pathEle = node.getPaths().get(0).getApath().split("/");
+                        builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
+                    }
+
+                    builder.startObject("permissions");
+                    builder.field("read",nodeData.getReader().getReaders());
+                    builder.endObject();
+
+                    builder.startObject("properties");
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
 
                         String key = Constants.getValidLocalName(prop.getKey());
@@ -124,6 +143,7 @@ public class ElasticsearchClient {
                             builder.field(key, value);
                         }
                     }
+                    builder.endObject();
 
                     builder.field("aspects", node.getAspects());
 
