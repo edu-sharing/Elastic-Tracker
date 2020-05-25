@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -89,8 +90,30 @@ public class ElasticsearchClient {
                             continue;
                         }
 
-                        builder.field(key, prop.getValue());
+                        Serializable value = prop.getValue();
 
+                        if(prop.getValue() instanceof List){
+                            List listvalue = (List)prop.getValue();
+
+                            //i.e. cm:title
+                            if( !listvalue.isEmpty() && listvalue.get(0) instanceof Map){
+                                value = getMultilangValue(listvalue);
+                            }
+
+                            //i.e. cclom:general_keyword
+                            if( !listvalue.isEmpty() && listvalue.get(0) instanceof List){
+                                List<String> mvValue = new ArrayList<String>();
+                                for(Object l : listvalue){
+                                    mvValue.add(getMultilangValue((List)l));
+                                }
+                                if(mvValue.size() > 0){
+                                    value = (Serializable) mvValue;
+                                }
+                            }
+                        }
+                        if(value != null) {
+                            builder.field(key, value);
+                        }
                     }
 
                     builder.field("aspects", node.getAspects());
@@ -127,6 +150,31 @@ public class ElasticsearchClient {
 
         client.close();
 
+    }
+
+    private String getMultilangValue(List listvalue){
+        if(listvalue.size() > 1){
+            // find german value i.e for Documents/Images edu folder
+            String value = null;
+            String defaultValue = null;
+
+            for(Object o : listvalue){
+                Map m = (Map)o;
+                //default is {key="locale",value="de"},{key="value",value="Deutsch"}
+                if(m.size() > 2){
+                    throw new RuntimeException("language map has only one value");
+                }
+                defaultValue = (String)m.get("value");
+                if("de".equals(m.get("locale"))){
+                    value = (String)m.get("value");
+                }
+            }
+            if(value == null) value = defaultValue;
+            return value;
+        }else {
+            Map multilangValue = (Map) listvalue.get(0);
+            return (String) multilangValue.get("value");
+        }
     }
 
     public void setTransaction(long txnCommitTime, long transactionId) throws IOException {
