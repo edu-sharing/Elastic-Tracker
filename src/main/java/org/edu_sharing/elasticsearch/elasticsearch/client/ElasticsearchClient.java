@@ -23,6 +23,7 @@ import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.index.mapper.MapperParsingException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -158,7 +159,12 @@ public class ElasticsearchClient {
                         }
 
                         if(value != null) {
-                            builder.field(key, value);
+
+                            try {
+                                builder.field(key, value);
+                            }catch(MapperParsingException e){
+                                logger.error("error parsing value field:" + key +"v"+value,e);
+                            }
                         }
                     }
                     builder.endObject();
@@ -176,13 +182,13 @@ public class ElasticsearchClient {
                 String index = indexResponse.getIndex();
                 String id = indexResponse.getId();
                 if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
-                    logger.info("created node in elastic:" + node);
+                    logger.debug("created node in elastic:" + node);
                 } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
-                    logger.info("updated node in elastic:" + node);
+                    logger.debug("updated node in elastic:" + node);
                 }
                 ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
                 if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-                    logger.error("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
+                    logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
                 }
                 if (shardInfo.getFailed() > 0) {
                     for (ReplicationResponse.ShardInfo.Failure failure :
@@ -247,7 +253,7 @@ public class ElasticsearchClient {
         }
         ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
         if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-            logger.error("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
+            logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
         }
         if (shardInfo.getFailed() > 0) {
             for (ReplicationResponse.ShardInfo.Failure failure :
@@ -294,7 +300,7 @@ public class ElasticsearchClient {
             long version = deleteResponse.getVersion();
             ReplicationResponse.ShardInfo shardInfo = deleteResponse.getShardInfo();
             if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-                logger.error("shardInfo.getTotal() != shardInfo.getSuccessful() index:" + index +" id:"+id + " version:"+version);
+                logger.debug("shardInfo.getTotal() != shardInfo.getSuccessful() index:" + index +" id:"+id + " version:"+version);
             }
             if (shardInfo.getFailed() > 0) {
                 for (ReplicationResponse.ShardInfo.Failure failure :
