@@ -3,6 +3,7 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.edu_sharing.elasticsearch.alfresco.client.Node;
 import org.edu_sharing.elasticsearch.alfresco.client.Path;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
@@ -284,14 +285,14 @@ public class ElasticsearchClient {
 
 
 
-    public void delete(List<NodeData> nodeDatas) throws IOException {
+    public void delete(List<Node> nodes) throws IOException {
         RestHighLevelClient client = getClient();
 
-        for(NodeData nodeData : nodeDatas){
-            NodeMetadata nmd = nodeData.getNodeMetadata();
+        for(Node node : nodes){
+
             DeleteRequest request = new DeleteRequest(
                     INDEX_WORKSPACE,
-                    Long.toString(nmd.getId()));
+                    Long.toString(node.getId()));
             DeleteResponse deleteResponse = client.delete(
                     request, RequestOptions.DEFAULT);
 
