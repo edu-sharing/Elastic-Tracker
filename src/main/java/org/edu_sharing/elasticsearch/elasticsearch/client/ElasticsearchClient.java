@@ -159,6 +159,13 @@ public class ElasticsearchClient {
                             }
                         }
 
+                        //prevent Elasticsearch exception failed to parse field's value: '1-01-07T01:00:00.000+01:00'
+                        if("ccm:replicationmodified".equals(key)){
+                            if(prop.getValue() != null) {
+                                value = prop.getValue().toString();
+                            }
+                        }
+
                         if(value != null) {
 
                             try {
