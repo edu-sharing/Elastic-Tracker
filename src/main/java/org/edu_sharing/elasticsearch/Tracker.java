@@ -40,7 +40,7 @@ public class Tracker {
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
 
-    final static int maxResults = 50;
+    final static int maxResults = 300;
 
     @Value("${tracker.timestep:36000000}")
     int nextTimeStep;
@@ -62,6 +62,19 @@ public class Tracker {
             logger.error("problems reaching elastic search server");
             throw e;
         }
+    }
+
+
+    public void test(){
+        GetNodeMetadataParam p = new GetNodeMetadataParam();
+        p.setNodeIds(Arrays.asList(new Long[]{6697L}));
+        try {
+            client.getNodeMetadata(p);
+        }catch (Exception e){
+            logger.error(e.getMessage(),e);
+            client.getNodeMetadata(p,true);
+        }
+
     }
 
     @Scheduled(cron = "*/5 * * * * *")
@@ -139,12 +152,37 @@ public class Tracker {
         }
 
         /**
-         * get node metadata
+         * collect deletes
          */
-        try {
-            List<NodeData> nodeData = client.getNodeData(nodes);
+        List<Node> toDelete = new ArrayList<Node>();
+        for(Node node : nodes){
+            if(node.getStatus().equals("d")) {
+                toDelete.add(node);
+            }
+        }
 
-            List<NodeData> toDelete = new ArrayList<NodeData>();
+        //filter deletes
+        nodes = nodes
+                .stream()
+                .filter(n -> !n.getStatus().equals("d"))
+                .collect(Collectors.toList());
+
+        /**
+         * get node metadata
+         *
+         * use every single node to get metadata instead of bulk to prevent damaged nodes break other nodes
+         */
+        List<NodeData> nodeData = new ArrayList<NodeData>();
+        for(Node node : nodes){
+            try {
+                List<NodeData> nodeDataTmp = client.getNodeData(Arrays.asList(new Node[] {node}));
+                nodeData.addAll(nodeDataTmp);
+            }catch(javax.ws.rs.ProcessingException e){
+                logger.error("error unmarshalling NodeMetadata for node " + node,e);
+            }
+        }
+        try{
+
             List<NodeData> toIndex = new ArrayList<NodeData>();
             for(NodeData data : nodeData){
 
@@ -152,25 +190,24 @@ public class Tracker {
                     String[] allowedTypesArray = allowedTypes.split(",");
                     String type = data.getNodeMetadata().getType();
                     if(!Arrays.asList(allowedTypesArray).contains(type)){
-                        logger.info("ignoring type:" + type);
+                        logger.debug("ignoring type:" + type);
                         continue;
                     }
                 }
 
-                if(data.getNode().getStatus().equals("d")){
-                    toDelete.add(data);
-                }else {
-                    eduSharingClient.translateValuespaceProps(data);
-                    toIndex.add(data);
-                }
+                eduSharingClient.translateValuespaceProps(data);
+                toIndex.add(data);
+
             }
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
-        }catch(javax.ws.rs.ProcessingException e){
-            logger.error("error unmarshalling NodeMetadata: " + Arrays.toString(nodes.toArray()),e);
+            if(lastFromCommitTime > last.getCommitTimeMs()){
+                logger.info("reseting lastFromCommitTime old:" +lastFromCommitTime +" new "+last.getCommitTimeMs());
+                lastFromCommitTime = last.getCommitTimeMs() + 1;
+            }
         }catch(IOException e){
             logger.error(e.getMessage(),e);
         }

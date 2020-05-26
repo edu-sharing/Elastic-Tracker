@@ -1,5 +1,6 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
+import org.apache.logging.log4j.LogManager;
 import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,6 +37,8 @@ public class AlfrescoWebscriptClient {
     String URL_ACL_READERS ="/alfresco/s/api/solr/aclsReaders";
 
 
+    org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
+
     private Client client;
 
 
@@ -62,11 +65,22 @@ public class AlfrescoWebscriptClient {
     }
 
     public NodeMetadatas getNodeMetadata(GetNodeMetadataParam param){
+        return this.getNodeMetadata(param,false);
+    }
+    public NodeMetadatas getNodeMetadata(GetNodeMetadataParam param, boolean debug){
         String url = getUrl(URL_NODE_METADATA);
-        NodeMetadatas nmds = client.target(url)
+        Response resp = client.target(url)
                 .request(MediaType.APPLICATION_JSON)
-                .post(Entity.json(param)).readEntity(NodeMetadatas.class);
-        return nmds;
+                .post(Entity.json(param));
+
+        if(debug){
+            String valueAsString = resp.readEntity(String.class);
+            logger.error("problems with node(s):" + valueAsString);
+            return null;
+        }else{
+            NodeMetadatas nmds = resp.readEntity(NodeMetadatas.class);
+            return nmds;
+        }
     }
 
     public List<NodeData> getNodeData(List<Node> nodes){
