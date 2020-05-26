@@ -40,7 +40,7 @@ public class Tracker {
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
 
-    final static int maxResults = 300;
+    final static int maxResults = 1000;
 
     @Value("${tracker.timestep:36000000}")
     int nextTimeStep;
@@ -56,6 +56,7 @@ public class Tracker {
             txn = elasticClient.getTransaction();
             if(txn != null){
                 lastFromCommitTime = txn.getTxnCommitTime();
+                lastTransactionId = txn.getTxnId();
                 logger.info("got last transaction from index txnCommitTime:" + txn.getTxnCommitTime() +" txnId" +txn.getTxnId());
             }
         } catch (IOException e) {
@@ -79,44 +80,37 @@ public class Tracker {
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
-        /*ValuespaceEntries entries = eduSharingClient.getValuespace("de-de","ccm:educationallearningresourcetype","default");
-        for(ValuespaceEntry e : entries.getValues()){
-            System.out.println(e.getKey() +" " +e.getDisplayString());
-        }
-        if(true)return;*/
-
-
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
-        long toCommitTime = lastFromCommitTime + nextTimeStep;
-        Transactions transactions = (lastFromCommitTime < 1)
+        Transactions transactions = (lastTransactionId < 1)
                 ? client.getTransactions(0L,2000L,null,null, 1, Tracker.storeWorkspace)
-                : client.getTransactions(null, null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace );
+                : client.getTransactions(lastTransactionId, lastTransactionId + Tracker.maxResults, null, null, Tracker.maxResults, Tracker.storeWorkspace );
+
+        //initialize
+        if(lastTransactionId < 1) lastTransactionId = transactions.getTransactions().get(0).getId();
+
+        //step forward
+        if(transactions.getMaxTxnId() > (lastTransactionId + Tracker.maxResults)){
+            lastTransactionId += Tracker.maxResults;
+        }else{
+            lastTransactionId = transactions.getMaxTxnId();
+        }
 
 
         if(transactions.getTransactions().size() == 0){
 
-            if(toCommitTime > transactions.getMaxTxnCommitTime()){
+            if(transactions.getMaxTxnId() <= lastTransactionId){
                 logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
                 //+1 to prevent repeating the last transaction over and over
                 //not longer necessary when we remember last transaction id in idx
                 this.lastFromCommitTime = transactions.getMaxTxnCommitTime() + 1;
                 return;
+            }else{
+
+                logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - Tracker.maxResults) +" max:"+lastTransactionId  );
             }
 
-            logger.info("start   : step forward in time to find next transaction from:" + lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
-            do{
 
-                lastFromCommitTime += nextTimeStep;
-                toCommitTime = lastFromCommitTime + nextTimeStep;
-                transactions = client.getTransactions(null,null, lastFromCommitTime, toCommitTime, Tracker.maxResults, Tracker.storeWorkspace);
-            }while(transactions.getTransactions().size() == 0 && toCommitTime < transactions.getMaxTxnCommitTime());
-            logger.info("finished: step forward in time from:"+ lastFromCommitTime +" to:" + toCommitTime + " max:"+ transactions.getMaxTxnCommitTime());
-
-            if(transactions.getTransactions().size() == 0) {
-                logger.info("no new transactions found lastTransactionId:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
-                return;
-            }
         }
 
         Transaction first = transactions.getTransactions().get(0);
@@ -124,10 +118,9 @@ public class Tracker {
 
         if(lastFromCommitTime < 1) {
             this.lastFromCommitTime = last.getCommitTimeMs();
-        }else{
-            this.lastFromCommitTime = toCommitTime;
         }
-        this.lastTransactionId = last.getId();
+
+
 
         /**
          * add transactionsIds as getNodes Param
@@ -213,7 +206,7 @@ public class Tracker {
         }
 
 
-        logger.info("finished lastTransactionId:" + this.lastTransactionId +
+        logger.info("finished lastTransactionId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
     }
