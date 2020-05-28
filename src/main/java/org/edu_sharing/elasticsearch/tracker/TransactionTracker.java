@@ -1,16 +1,13 @@
-package org.edu_sharing.elasticsearch;
+package org.edu_sharing.elasticsearch.tracker;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
-import org.edu_sharing.elasticsearch.edu_sharing.client.ValuespaceEntries;
-import org.edu_sharing.elasticsearch.edu_sharing.client.ValuespaceEntry;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +20,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-public class Tracker {
+public class TransactionTracker {
 
     @Autowired
     private AlfrescoWebscriptClient client;
@@ -47,7 +44,7 @@ public class Tracker {
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
-    Logger logger = LogManager.getLogger(Tracker.class);
+    Logger logger = LogManager.getLogger(TransactionTracker.class);
 
     @PostConstruct
     public void init()  throws IOException{
@@ -83,15 +80,15 @@ public class Tracker {
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
         Transactions transactions = (lastTransactionId < 1)
-                ? client.getTransactions(0L,2000L,null,null, 1, Tracker.storeWorkspace)
-                : client.getTransactions(lastTransactionId, lastTransactionId + Tracker.maxResults, null, null, Tracker.maxResults, Tracker.storeWorkspace );
+                ? client.getTransactions(0L,2000L,null,null, 1, TransactionTracker.storeWorkspace)
+                : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults, TransactionTracker.storeWorkspace );
 
         //initialize
         if(lastTransactionId < 1) lastTransactionId = transactions.getTransactions().get(0).getId();
 
         //step forward
-        if(transactions.getMaxTxnId() > (lastTransactionId + Tracker.maxResults)){
-            lastTransactionId += Tracker.maxResults;
+        if(transactions.getMaxTxnId() > (lastTransactionId + TransactionTracker.maxResults)){
+            lastTransactionId += TransactionTracker.maxResults;
         }else{
             lastTransactionId = transactions.getMaxTxnId();
         }
@@ -107,7 +104,7 @@ public class Tracker {
                 return;
             }else{
 
-                logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - Tracker.maxResults) +" max:"+lastTransactionId  );
+                logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
             }
 
 
