@@ -4,7 +4,6 @@ import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
-import org.edu_sharing.elasticsearch.alfresco.client.Path;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
@@ -55,6 +54,10 @@ public class ElasticsearchClient {
     public static String INDEX_TRANSACTIONS = "transactions";
 
     public static String TYPE = "node";
+
+    final static String ID_TRANSACTION = "1";
+
+    final static String ID_ACL = "2";
 
 
     @PostConstruct
@@ -239,7 +242,7 @@ public class ElasticsearchClient {
     }
 
     public void setTransaction(long txnCommitTime, long transactionId) throws IOException {
-        RestHighLevelClient client = getClient();
+
         XContentBuilder builder = jsonBuilder();
         builder.startObject();
         {
@@ -248,16 +251,20 @@ public class ElasticsearchClient {
         }
         builder.endObject();
 
-        IndexRequest indexRequest = new IndexRequest(INDEX_TRANSACTIONS)
-                .id("1").source(builder);
+        setNode(INDEX_TRANSACTIONS, ID_TRANSACTION,builder);
+    }
+
+    private void setNode(String index, String id, XContentBuilder builder) throws IOException {
+        RestHighLevelClient client = getClient();
+        IndexRequest indexRequest = new IndexRequest(index)
+                .id(id).source(builder);
 
         IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-        String index = indexResponse.getIndex();
-        String id = indexResponse.getId();
+
         if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
-            logger.info("created tx in elastic:" + transactionId +" txnCommitTime:"+txnCommitTime);
+            logger.info("created node in elastic:" + builder);
         } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
-            logger.info("updated tx in elastic:" + transactionId +" txnCommitTime:"+txnCommitTime);
+            logger.info("updated node in elastic:" + builder);
         }
         ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
         if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
@@ -273,11 +280,17 @@ public class ElasticsearchClient {
         client.close();
     }
 
-    public Tx getTransaction() throws IOException {
+    private GetResponse get(String index, String id) throws IOException {
         RestHighLevelClient client = getClient();
-        GetRequest getRequest = new GetRequest(INDEX_TRANSACTIONS,"1");
+        GetRequest getRequest = new GetRequest(index,id);
         GetResponse resp = client.get(getRequest,RequestOptions.DEFAULT);
+        client.close();
+        return resp;
+    }
 
+    public Tx getTransaction() throws IOException {
+
+        GetResponse resp = this.get(INDEX_TRANSACTIONS, ID_TRANSACTION);
         Tx transaction = null;
         if(resp.isExists()) {
 
@@ -286,9 +299,36 @@ public class ElasticsearchClient {
             transaction.setTxnId((Integer) resp.getSource().get("txnId"));
         }
 
-        client.close();
         return transaction;
     }
+
+
+    public void setACL(long aclCommitTime, long aclId) throws IOException {
+        XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        {
+            builder.field("aclId", aclId);
+            builder.field("aclCommitTime",aclCommitTime);
+        }
+        builder.endObject();
+
+        setNode(INDEX_TRANSACTIONS, ID_ACL,builder);
+    }
+
+    public ACL getACL() throws IOException {
+        GetResponse resp = this.get(INDEX_TRANSACTIONS,ID_ACL);
+
+        ACL acl = null;
+        if(resp.isExists()) {
+            acl = new ACL();
+            acl.setAclCommitTime((Long) resp.getSource().get("aclCommitTime"));
+            acl.setAclId((Integer) resp.getSource().get("aclId"));
+        }
+
+        return acl;
+    }
+
+
 
 
 

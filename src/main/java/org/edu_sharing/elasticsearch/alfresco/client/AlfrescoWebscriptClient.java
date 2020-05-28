@@ -36,6 +36,9 @@ public class AlfrescoWebscriptClient {
 
     String URL_ACL_READERS ="/alfresco/s/api/solr/aclsReaders";
 
+    String URL_ACL_CHANGESETS = "/alfresco/s/api/solr/aclchangesets";
+
+    String URL_ACLS = "/alfresco/s/api/solr/acls";
 
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
 
@@ -165,6 +168,26 @@ public class AlfrescoWebscriptClient {
                 .get(Transactions.class);
 
         return transactions;
+    }
+
+    public AclChangeSets getAclChangeSets(Long fromId, Long toId, int maxResults){
+        String url = getUrl(URL_ACL_CHANGESETS);
+        AclChangeSets result = client.target(url)
+                .queryParam("fromId",fromId)
+                .queryParam("toId",toId)
+                .queryParam("maxResults",maxResults)
+                .request(MediaType.APPLICATION_JSON)
+                .get(AclChangeSets.class);
+        return result;
+    }
+
+    public Acls getAcls(GetAclsParam param){
+        String url = getUrl(URL_ACLS);
+        Acls readers = client.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.json(param)).readEntity(Acls.class);
+
+        return readers;
     }
 
 
