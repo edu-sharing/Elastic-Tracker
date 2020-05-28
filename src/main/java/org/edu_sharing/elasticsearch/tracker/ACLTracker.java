@@ -4,8 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.elasticsearch.client.ACLChangeSet;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
-import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-public class TransactionTracker {
+public class ACLTracker {
 
     @Autowired
     private AlfrescoWebscriptClient client;
@@ -35,7 +35,7 @@ public class TransactionTracker {
     String allowedTypes;
 
     long lastFromCommitTime = -1;
-    long lastTransactionId = -1;
+    long lastACLChangeSetId = -1;
 
     final static int maxResults = 1000;
 
@@ -44,17 +44,17 @@ public class TransactionTracker {
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
-    Logger logger = LogManager.getLogger(TransactionTracker.class);
+    Logger logger = LogManager.getLogger(ACLTracker.class);
 
     @PostConstruct
     public void init()  throws IOException{
-        Tx txn = null;
+        ACLChangeSet aclChangeSet = null;
         try {
-            txn = elasticClient.getTransaction();
-            if(txn != null){
-                lastFromCommitTime = txn.getTxnCommitTime();
-                lastTransactionId = txn.getTxnId();
-                logger.info("got last transaction from index txnCommitTime:" + txn.getTxnCommitTime() +" txnId" +txn.getTxnId());
+            aclChangeSet = elasticClient.getACL();
+            if(aclChangeSet != null){
+                lastFromCommitTime = aclChangeSet.getAclCommitTime();
+                lastACLChangeSetId = aclChangeSet.getAclId();
+                logger.info("got last aclChangeSet from index aclCommitTime:" + aclChangeSet.getAclCommitTime() +" aclId" + aclChangeSet.getAclId());
             }
         } catch (IOException e) {
             logger.error("problems reaching elastic search server");
@@ -63,61 +63,59 @@ public class TransactionTracker {
     }
 
 
-    public void test(){
-        GetNodeMetadataParam p = new GetNodeMetadataParam();
-        p.setNodeIds(Arrays.asList(new Long[]{6697L}));
-        try {
-            client.getNodeMetadata(p);
-        }catch (Exception e){
-            logger.error(e.getMessage(),e);
-            client.getNodeMetadata(p,true);
-        }
-
-    }
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
-        logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
+        logger.info("starting lastACLChangeSetId:" + lastACLChangeSetId + " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
-        Transactions transactions = (lastTransactionId < 1)
-                ? client.getTransactions(0L,2000L,null,null, 1, TransactionTracker.storeWorkspace)
-                : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults, TransactionTracker.storeWorkspace );
+
+        AclChangeSets aclChangeSets = (lastACLChangeSetId < 1)
+                ? client.getAclChangeSets(0L,2000L,1)
+                : client.getAclChangeSets(lastACLChangeSetId, lastACLChangeSetId + ACLTracker.maxResults,ACLTracker.maxResults);
+
 
         //initialize
-        if(lastTransactionId < 1) lastTransactionId = transactions.getTransactions().get(0).getId();
+        if(lastACLChangeSetId < 1) lastACLChangeSetId = aclChangeSets.getAclChangeSets().get(0).getId();
 
         //step forward
-        if(transactions.getMaxTxnId() > (lastTransactionId + TransactionTracker.maxResults)){
-            lastTransactionId += TransactionTracker.maxResults;
+        if(aclChangeSets.getMaxChangeSetId() > (lastACLChangeSetId + ACLTracker.maxResults)){
+            lastACLChangeSetId += ACLTracker.maxResults;
         }else{
-            lastTransactionId = transactions.getMaxTxnId();
+            lastACLChangeSetId = aclChangeSets.getMaxChangeSetId();
         }
 
 
-        if(transactions.getTransactions().size() == 0){
+        if(aclChangeSets.getAclChangeSets().size() == 0){
 
-            if(transactions.getMaxTxnId() <= lastTransactionId){
-                logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
+            if(aclChangeSets.getMaxChangeSetId() <= lastACLChangeSetId){
+                logger.info("index is up to date:" + lastACLChangeSetId + " lastFromCommitTime:" + lastFromCommitTime);
                 //+1 to prevent repeating the last transaction over and over
                 //not longer necessary when we remember last transaction id in idx
-                this.lastFromCommitTime = transactions.getMaxTxnCommitTime() + 1;
+                this.lastFromCommitTime = aclChangeSets.getMaxChangeSetId() + 1;
                 return;
             }else{
 
-                logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
+                logger.info("did not found new transactions in last transaction block min:" + (lastACLChangeSetId - ACLTracker.maxResults) +" max:"+ lastACLChangeSetId);
             }
-
-
         }
 
-        Transaction first = transactions.getTransactions().get(0);
-        Transaction last = transactions.getTransactions().get(transactions.getTransactions().size() -1);
+        AclChangeSet first = aclChangeSets.getAclChangeSets().get(0);
+        AclChangeSet last = aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() -1);
 
         if(lastFromCommitTime < 1) {
             this.lastFromCommitTime = last.getCommitTimeMs();
         }
 
 
+        GetAclsParam param = new GetAclsParam();
+        for(AclChangeSet aclChangeSet : aclChangeSets.getAclChangeSets()){
+            param.getAclChangeSetIds().add(aclChangeSet.getId());
+        }
+
+        Acls acls = client.getAcls(param);
+        for(Acl acl : acls.getAcls()){
+
+        }
 
         /**
          * add transactionsIds as getNodes Param
@@ -203,7 +201,7 @@ public class TransactionTracker {
         }
 
 
-        logger.info("finished lastTransactionId:" + last.getId() +
+        logger.info("finished lastACLChangeSetId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
     }

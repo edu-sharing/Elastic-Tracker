@@ -57,7 +57,7 @@ public class ElasticsearchClient {
 
     final static String ID_TRANSACTION = "1";
 
-    final static String ID_ACL = "2";
+    final static String ID_ACL_CHANGESET = "2";
 
 
     @PostConstruct
@@ -303,33 +303,30 @@ public class ElasticsearchClient {
     }
 
 
-    public void setACL(long aclCommitTime, long aclId) throws IOException {
+    public void setACL(long aclChangeSetTime, long aclChangeSetId) throws IOException {
         XContentBuilder builder = jsonBuilder();
         builder.startObject();
         {
-            builder.field("aclId", aclId);
-            builder.field("aclCommitTime",aclCommitTime);
+            builder.field("aclChangeSetId", aclChangeSetId);
+            builder.field("aclChangeSetCommitTime",aclChangeSetTime);
         }
         builder.endObject();
 
-        setNode(INDEX_TRANSACTIONS, ID_ACL,builder);
+        setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET,builder);
     }
 
-    public ACL getACL() throws IOException {
-        GetResponse resp = this.get(INDEX_TRANSACTIONS,ID_ACL);
+    public ACLChangeSet getACL() throws IOException {
+        GetResponse resp = this.get(INDEX_TRANSACTIONS, ID_ACL_CHANGESET);
 
-        ACL acl = null;
+        ACLChangeSet aclChangeSet = null;
         if(resp.isExists()) {
-            acl = new ACL();
-            acl.setAclCommitTime((Long) resp.getSource().get("aclCommitTime"));
-            acl.setAclId((Integer) resp.getSource().get("aclId"));
+            aclChangeSet = new ACLChangeSet();
+            aclChangeSet.setAclCommitTime((Long) resp.getSource().get("aclCommitTime"));
+            aclChangeSet.setAclId((Integer) resp.getSource().get("aclId"));
         }
 
-        return acl;
+        return aclChangeSet;
     }
-
-
-
 
 
     public void delete(List<Node> nodes) throws IOException {

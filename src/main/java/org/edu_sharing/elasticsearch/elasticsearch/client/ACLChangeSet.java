@@ -1,6 +1,6 @@
 package org.edu_sharing.elasticsearch.elasticsearch.client;
 
-public class ACL {
+public class ACLChangeSet {
 
     int aclId;
     long aclCommitTime;
