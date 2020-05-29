@@ -2,22 +2,22 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 
 public class ACLChangeSet {
 
-    int aclId;
-    long aclCommitTime;
+    int aclChangeSetId;
+    long aclChangeSetCommitTime;
 
-    public int getAclId() {
-        return aclId;
+    public int getAclChangeSetId() {
+        return aclChangeSetId;
     }
 
-    public void setAclId(int aclId) {
-        this.aclId = aclId;
+    public void setAclChangeSetId(int aclChangeSetId) {
+        this.aclChangeSetId = aclChangeSetId;
     }
 
-    public long getAclCommitTime() {
-        return aclCommitTime;
+    public long getAclChangeSetCommitTime() {
+        return aclChangeSetCommitTime;
     }
 
-    public void setAclCommitTime(long aclCommitTime) {
-        this.aclCommitTime = aclCommitTime;
+    public void setAclChangeSetCommitTime(long aclChangeSetCommitTime) {
+        this.aclChangeSetCommitTime = aclChangeSetCommitTime;
     }
 }

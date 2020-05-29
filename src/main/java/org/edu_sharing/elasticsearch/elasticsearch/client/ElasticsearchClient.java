@@ -4,6 +4,7 @@ import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
+import org.edu_sharing.elasticsearch.alfresco.client.Reader;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
@@ -15,7 +16,11 @@ import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -24,6 +29,11 @@ import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -71,6 +81,33 @@ public class ElasticsearchClient {
         client.close();
     }
 
+    public void updateReader(long dbid, Reader reader) throws IOException {
+        RestHighLevelClient client = getClient();
+
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        builder.startObject();
+        {
+            builder.field("read",reader.getReaders());
+        }
+        builder.endObject();
+        UpdateRequest request = new UpdateRequest(
+                INDEX_WORKSPACE,
+                Long.toString(dbid)).doc(builder);
+        UpdateResponse updateResponse = client.update(
+                request, RequestOptions.DEFAULT);
+        String index = updateResponse.getIndex();
+        String id = updateResponse.getId();
+        long version = updateResponse.getVersion();
+        if (updateResponse.getResult() == DocWriteResponse.Result.CREATED) {
+            logger.error("object did not exist");
+        } else if (updateResponse.getResult() == DocWriteResponse.Result.UPDATED) {
+
+        } else if (updateResponse.getResult() == DocWriteResponse.Result.DELETED) {
+
+        } else if (updateResponse.getResult() == DocWriteResponse.Result.NOOP) {
+
+        }
+    }
     public void index(List<NodeData> nodes) throws IOException{
         RestHighLevelClient client = getClient();
 
@@ -303,7 +340,7 @@ public class ElasticsearchClient {
     }
 
 
-    public void setACL(long aclChangeSetTime, long aclChangeSetId) throws IOException {
+    public void setACLChangeSet(long aclChangeSetTime, long aclChangeSetId) throws IOException {
         XContentBuilder builder = jsonBuilder();
         builder.startObject();
         {
@@ -315,14 +352,14 @@ public class ElasticsearchClient {
         setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET,builder);
     }
 
-    public ACLChangeSet getACL() throws IOException {
+    public ACLChangeSet getACLChangeSet() throws IOException {
         GetResponse resp = this.get(INDEX_TRANSACTIONS, ID_ACL_CHANGESET);
 
         ACLChangeSet aclChangeSet = null;
         if(resp.isExists()) {
             aclChangeSet = new ACLChangeSet();
-            aclChangeSet.setAclCommitTime((Long) resp.getSource().get("aclCommitTime"));
-            aclChangeSet.setAclId((Integer) resp.getSource().get("aclId"));
+            aclChangeSet.setAclChangeSetCommitTime((Long) resp.getSource().get("aclChangeSetCommitTime"));
+            aclChangeSet.setAclChangeSetId((int)resp.getSource().get("aclChangeSetId"));
         }
 
         return aclChangeSet;
@@ -396,6 +433,23 @@ public class ElasticsearchClient {
         }
     }
 
+    public SearchHits searchForAclId(long acl) throws IOException {
+        return this.search(INDEX_WORKSPACE, QueryBuilders.termQuery("aclId", acl), 0, 10000);
+    }
+
+    public SearchHits search(String index, QueryBuilder queryBuilder, int from, int size) throws IOException {
+        RestHighLevelClient client = getClient();
+        SearchRequest searchRequest = new SearchRequest(index);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(queryBuilder);
+        searchSourceBuilder.from(from);
+        searchSourceBuilder.size(size);
+        searchRequest.source(searchSourceBuilder);
+        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        client.close();
+        return searchResponse.getHits();
+    }
+
     RestHighLevelClient getClient(){
       return new RestHighLevelClient(
                 RestClient.builder(
@@ -403,5 +457,7 @@ public class ElasticsearchClient {
                         //,new HttpHost("localhost", 9201, "http")
                 ));
     };
+
+
 
 }
