@@ -75,7 +75,6 @@ public class TransactionTracker {
 
     }
 
-    @Scheduled(cron = "*/5 * * * * *")
     public void track(){
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 

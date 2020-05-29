@@ -302,9 +302,9 @@ public class ElasticsearchClient {
         IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
 
         if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
-            logger.info("created node in elastic:" + builder);
+            logger.debug("created node in elastic:" + builder);
         } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
-            logger.info("updated node in elastic:" + builder);
+            logger.debug("updated node in elastic:" + builder);
         }
         ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
         if (shardInfo.getTotal() != shardInfo.getSuccessful()) {

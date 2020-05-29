@@ -61,8 +61,6 @@ public class ACLTracker {
         }
     }
 
-
-    //@Scheduled(cron = "*/5 * * * * *")
     public void track() {
         logger.info("starting lastACLChangeSetId:" + lastACLChangeSetId + " lastFromCommitTime:" + lastFromCommitTime + " " + new Date(lastFromCommitTime));
 
