@@ -146,7 +146,7 @@ public class ACLTracker {
                         elasticClient.updateReader(dbid, reader);
                         logger.info("readers updated for dbid:" + dbid);
                     }else{
-                        logger.info("readers did not change in elastic dbid:" +dbid);
+                        logger.debug("readers did not change in elastic dbid:" +dbid);
                     }
                 }
             }
@@ -157,7 +157,6 @@ public class ACLTracker {
         }
 
 
-        logger.info("finished lastACLChangeSetId:" + last.getId() +
-                " aclChangeSets:" + aclChangeSets);
+        logger.info("finished lastACLChangeSetId:" + last.getId());
     }
 }
