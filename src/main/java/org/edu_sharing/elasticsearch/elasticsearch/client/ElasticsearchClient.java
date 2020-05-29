@@ -72,10 +72,15 @@ public class ElasticsearchClient {
 
     @PostConstruct
     public void init() throws IOException {
-        GetIndexRequest request = new GetIndexRequest(INDEX_TRANSACTIONS);
+        createIndexIfNotExists(INDEX_TRANSACTIONS);
+        createIndexIfNotExists(INDEX_WORKSPACE);
+    }
+
+    private void createIndexIfNotExists(String index) throws IOException{
+        GetIndexRequest request = new GetIndexRequest(index);
         RestHighLevelClient client = getClient();
         if(!client.indices().exists(request,RequestOptions.DEFAULT)){
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX_TRANSACTIONS);
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest(index);
             client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
         }
         client.close();

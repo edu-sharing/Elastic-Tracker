@@ -8,12 +8,14 @@ import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 import java.util.logging.Level;
@@ -37,7 +39,7 @@ public class EduSharingClient {
     @Value("${alfresco.password}")
     String alfrescoPassword;
 
-    @Value("${valuespace.props}")
+
     String[] valuespaceProps;
 
     @Value("${valuespace.languages}")
@@ -48,14 +50,22 @@ public class EduSharingClient {
 
     String URL_MDS_VALUES = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}/values";
 
+    String URL_MDS = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}";
+
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
+
 
     public EduSharingClient(){
         Logger logger = Logger.getLogger(getClass().getName());
         Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
         client = ClientBuilder.newBuilder().register(feature).build();
+    }
+
+    @PostConstruct
+    public void init()  throws IOException {
+        valuespaceProps = getValuespaceProperties("-default-").toArray(new String[]{});
     }
 
     public String translate(String mds, String language, String property, String key){
@@ -160,6 +170,25 @@ public class EduSharingClient {
                 .post(Entity.json(params)).readEntity(ValuespaceEntries.class);
         addValuespaceToCache(mds, language, property, entries);
         return entries;
+    }
+
+    public List<String> getValuespaceProperties(String mds){
+        String url = new String(URL_MDS);
+        url = url.replace("${mds}",mds);
+        url = getUrl(url);
+        MdsV2 mdsV2 = client
+                .target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword))
+        .get().readEntity(MdsV2.class);
+
+        List<String> result = new ArrayList<>();
+        for(WidgetV2 widget : mdsV2.getWidgets()){
+            if(widget.isHasValues()){
+                result.add(widget.getId());
+            }
+        }
+        return result;
     }
 
     private String getUrl(String path){

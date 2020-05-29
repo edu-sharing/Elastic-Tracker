@@ -63,18 +63,6 @@ public class TransactionTracker {
     }
 
 
-    public void test(){
-        GetNodeMetadataParam p = new GetNodeMetadataParam();
-        p.setNodeIds(Arrays.asList(new Long[]{6697L}));
-        try {
-            client.getNodeMetadata(p);
-        }catch (Exception e){
-            logger.error(e.getMessage(),e);
-            client.getNodeMetadata(p,true);
-        }
-
-    }
-
     public void track(){
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
