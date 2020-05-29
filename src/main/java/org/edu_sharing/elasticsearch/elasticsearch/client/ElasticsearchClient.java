@@ -87,7 +87,9 @@ public class ElasticsearchClient {
         XContentBuilder builder = XContentFactory.jsonBuilder();
         builder.startObject();
         {
+            builder.startObject("permissions");
             builder.field("read",reader.getReaders());
+            builder.endObject();
         }
         builder.endObject();
         UpdateRequest request = new UpdateRequest(
@@ -107,6 +109,7 @@ public class ElasticsearchClient {
         } else if (updateResponse.getResult() == DocWriteResponse.Result.NOOP) {
 
         }
+        client.close();
     }
     public void index(List<NodeData> nodes) throws IOException{
         RestHighLevelClient client = getClient();

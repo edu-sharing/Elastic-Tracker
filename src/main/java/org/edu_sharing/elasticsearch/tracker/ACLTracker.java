@@ -16,8 +16,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Date;
+import java.util.*;
 
 @Component
 public class ACLTracker {
@@ -94,7 +93,7 @@ public class ACLTracker {
                 return;
             } else {
 
-                logger.info("did not found new aclchangesets in last aclchangeset block min:" + (lastACLChangeSetId - ACLTracker.maxResults) + " max:" + lastACLChangeSetId);
+                logger.info("did not found new aclchangesets in last aclchangeset block from:" + (lastACLChangeSetId - ACLTracker.maxResults) + " to:" + lastACLChangeSetId + " MaxChangeSetId:" +aclChangeSets.getMaxChangeSetId());
                 return;
             }
         }
@@ -137,8 +136,20 @@ public class ACLTracker {
 
                     int dbid = (int)hit.getSourceAsMap().get("dbid");
 
-                    elasticClient.updateReader(dbid,reader);
-                    logger.info("updated reader for dbid:" +dbid);
+                    //List<String> elasticReader = ( List<String> )hit.getSourceAsMap().get("permissions.read");
+                    HashMap elasticPermissions = (HashMap)hit.getSourceAsMap().get("permissions");
+                    List<String> elasticReader = ( List<String> ) elasticPermissions.get("read");
+                    List<String> alfReader = reader.getReaders();
+
+                    Collections.sort(elasticReader);
+                    Collections.sort(alfReader);
+
+                    if(!elasticReader.equals(alfReader)) {
+                        elasticClient.updateReader(dbid, reader);
+                        logger.info("readers updated for dbid:" + dbid);
+                    }else{
+                        logger.info("readers did not change in elastic dbid:" +dbid);
+                    }
                 }
             }
             long lastAclChangesetid = aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() - 1).getId();
