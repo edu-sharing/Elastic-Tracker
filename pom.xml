@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>org.edu_sharing.elasticsearch</groupId>
 	<artifactId>Edu-SharingElasticsearchTracker</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0-SNAPSHOT</version>
 	<name>Edu-Sharing Elasticsearch Tracker</name>
 	<description>Tracker for Elastic Search</description>
 
@@ -86,7 +86,6 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-
 
 	</dependencies>
 
