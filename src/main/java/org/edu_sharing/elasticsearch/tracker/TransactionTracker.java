@@ -66,6 +66,8 @@ public class TransactionTracker {
     public void track(){
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
+        eduSharingClient.refreshValuespaceCache();
+
         Transactions transactions = (lastTransactionId < 1)
                 ? client.getTransactions(0L,2000L,null,null, 1, TransactionTracker.storeWorkspace)
                 : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults, TransactionTracker.storeWorkspace );

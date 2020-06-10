@@ -45,12 +45,21 @@ public class EduSharingClient {
     @Value("${valuespace.languages}")
     String[] valuespaceLanguages;
 
+    @Value("${valuespace.cache.check.after.ms : 120000}")
+    long valuespaceCacheCheckAfterMs = 120000;
+
+    long valuespaceCacheLastChecked = -1;
+
+    long valuespaceCacheLastModified = -1;
+
 
     private Client client;
 
     String URL_MDS_VALUES = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}/values";
 
     String URL_MDS = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}";
+
+    String URL_ABOUT = "/edu-sharing/rest/_about";
 
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
@@ -189,6 +198,37 @@ public class EduSharingClient {
             }
         }
         return result;
+    }
+
+    public About getAbout(){
+        String url = new String(URL_ABOUT);
+        url = getUrl(url);
+        About about = client
+                .target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .get().readEntity(About.class);
+        return about;
+    }
+
+
+    /**
+     * refreshes cache when necessary
+     * use valuespace.cache.check.after.ms config to determine check frequence
+     */
+    public void refreshValuespaceCache(){
+        if(valuespaceCacheLastChecked == -1
+                || valuespaceCacheLastChecked < (System.currentTimeMillis() - valuespaceCacheCheckAfterMs) ){
+            logger.info("will check if cache in edu-sharing changed");
+            About about = getAbout();
+            if(about.getLastCacheUpdate() > valuespaceCacheLastModified){
+                logger.info("repos last cache updated" + new Date(about.getLastCacheUpdate())
+                        +": force valuespace cache refresh");
+                cache.clear();
+                valuespaceCacheLastModified = about.getLastCacheUpdate();
+            }
+            valuespaceCacheLastChecked = System.currentTimeMillis();
+        }
+
     }
 
     private String getUrl(String path){
