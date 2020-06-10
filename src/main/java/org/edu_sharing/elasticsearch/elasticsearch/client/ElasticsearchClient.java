@@ -1,15 +1,15 @@
 package org.edu_sharing.elasticsearch.elasticsearch.client;
 
+
 import org.apache.http.HttpHost;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
-import org.edu_sharing.elasticsearch.alfresco.client.Reader;
-import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
+import org.edu_sharing.elasticsearch.alfresco.client.Reader;
+import org.edu_sharing.elasticsearch.tools.Constants;
 import org.elasticsearch.action.DocWriteResponse;
-
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -31,7 +31,6 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -169,6 +168,33 @@ public class ElasticsearchClient {
                     builder.startObject("permissions");
                     builder.field("read",nodeData.getReader().getReaders());
                     builder.endObject();
+
+                    //content
+                    /**
+                     *     "{http://www.alfresco.org/model/content/1.0}content": {
+                     *    "contentId": "279",
+                     *    "encoding": "UTF-8",
+                     *    "locale": "de_DE_",
+                     *    "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                     *    "size": "8385"
+                     * },
+                     */
+                    LinkedHashMap content = (LinkedHashMap)node.getProperties().get("{http://www.alfresco.org/model/content/1.0}content");
+                    if(content != null){
+
+                        builder.startObject("content");
+                        builder.field("contentId", content.get("contentId"));
+                        builder.field("encoding", content.get("encoding"));
+                        builder.field("locale", content.get("locale"));
+                        builder.field("mimetype", content.get("mimetype"));
+                        builder.field("size", content.get("size"));
+                        if(nodeData.getFullText() != null){
+                            builder.field("fulltext", nodeData.getFullText());
+                        }
+                        builder.endObject();
+                    }
+
+
 
                     builder.startObject("properties");
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {

@@ -40,6 +40,8 @@ public class AlfrescoWebscriptClient {
 
     String URL_ACLS = "/alfresco/s/api/solr/acls";
 
+    String URL_CONTENT = "/alfresco/s/api/solr/textContent";
+
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
 
     private Client client;
@@ -65,6 +67,14 @@ public class AlfrescoWebscriptClient {
                 .post(Entity.json(p)).readEntity(Nodes.class);
 
         return node.getNodes();
+    }
+
+    public String getTextContent(Long dbid){
+        String url = getUrl(URL_CONTENT);
+        url += "?nodeId="+dbid;
+        return client.target(url)
+                .request(MediaType.TEXT_PLAIN)
+                .get().readEntity(String.class);
     }
 
     public NodeMetadatas getNodeMetadata(GetNodeMetadataParam param){
@@ -127,6 +137,11 @@ public class AlfrescoWebscriptClient {
 
                     result.add(nodeData);
                 }
+        }
+
+        for(NodeData nodeData : result){
+            String fullText = getTextContent(nodeData.getNode().getId());
+            if(fullText != null) nodeData.setFullText(fullText);
         }
 
         return result;
