@@ -13,4 +13,17 @@ public class Tools {
         String authHeader = "Basic " + new String(encodedAuth);
         return authHeader;
     }
+
+    public static String getStoreRef(String nodeRef){
+        return getProtocol(nodeRef) + "://" + getIdentifier(nodeRef);
+    }
+
+    public static String getProtocol(String nodeRef){
+        return nodeRef.split("://")[0];
+    }
+
+    public static String getIdentifier(String nodeRef){
+        return nodeRef.split("://")[1].split("/")[0];
+    }
+
 }

@@ -9,6 +9,7 @@ import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
 import org.edu_sharing.elasticsearch.alfresco.client.Reader;
 import org.edu_sharing.elasticsearch.tools.Constants;
+import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
@@ -120,14 +121,16 @@ public class ElasticsearchClient {
 
         for(NodeData nodeData: nodes) {
             NodeMetadata node = nodeData.getNodeMetadata();
+            String storeRefProtocol = Tools.getProtocol(node.getNodeRef());
+            String storeRefIdentifier = Tools.getIdentifier(node.getNodeRef());
+            String storeRef = Tools.getStoreRef(node.getNodeRef());
                 XContentBuilder builder = jsonBuilder();
                 builder.startObject();
                 {
                     builder.field("aclId",  node.getAclId());
                     builder.field("txnId",node.getTxnId());
                     builder.field("dbid",node.getId());
-                    String storeRefProtocol = node.getNodeRef().split("://")[0];
-                    String storeRefIdentifier = node.getNodeRef().split("://")[1].split("/")[0];
+
                     String id = node.getNodeRef().split("://")[1].split("/")[1];
                     builder.startObject("nodeRef")
                             .startObject("storeRef")
@@ -430,6 +433,10 @@ public class ElasticsearchClient {
         client.close();
     }
 
+    /**
+     * @TODO
+     * @throws IOException
+     */
     public void createIndex() throws IOException {
         try {
             RestHighLevelClient client = getClient();

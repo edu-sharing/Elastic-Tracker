@@ -6,6 +6,7 @@ import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
+import org.edu_sharing.elasticsearch.tools.Tools;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +34,9 @@ public class TransactionTracker {
 
     @Value("${allowed.types}")
     String allowedTypes;
+
+    @Value("${index.storerefs}")
+    List<String> indexStoreRefs;
 
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
@@ -115,10 +119,10 @@ public class TransactionTracker {
          * get nodes
          */
         List<Node> nodes =  client.getNodes(transactionIds);
-        //filter non workspace://SpacesStore
+        //filter stores
         nodes = nodes
                 .stream()
-                .filter(n -> n.getNodeRef().startsWith("workspace://SpacesStore/"))
+                .filter(n -> indexStoreRefs.contains(Tools.getStoreRef(n.getNodeRef())))
                 .collect(Collectors.toList());
 
         if(nodes.size() == 0){
