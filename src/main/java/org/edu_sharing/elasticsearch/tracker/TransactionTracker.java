@@ -39,8 +39,6 @@ public class TransactionTracker {
 
     final static int maxResults = 1000;
 
-    @Value("${tracker.timestep:36000000}")
-    int nextTimeStep;
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
