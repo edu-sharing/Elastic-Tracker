@@ -157,7 +157,7 @@ public class AlfrescoWebscriptClient {
     }
 
 
-    public Transactions getTransactions(Long minTxnId, Long maxTxnId, Long fromCommitTime, Long toCommitTime, int maxResults, String stores){
+    public Transactions getTransactions(Long minTxnId, Long maxTxnId, Long fromCommitTime, Long toCommitTime, int maxResults){
 
 
         String url = getUrl(URL_TRANSACTIONS);
@@ -178,7 +178,6 @@ public class AlfrescoWebscriptClient {
                 .queryParam(fromParam,fromValue)
                 .queryParam(toParam,toValue)
                 .queryParam("maxResults",maxResults)
-                .queryParam("stores",stores)
                 .request(MediaType.APPLICATION_JSON)
                 .get(Transactions.class);
 

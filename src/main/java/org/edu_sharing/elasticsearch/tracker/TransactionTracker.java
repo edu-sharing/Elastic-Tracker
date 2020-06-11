@@ -39,9 +39,6 @@ public class TransactionTracker {
 
     final static int maxResults = 1000;
 
-
-    final static String storeWorkspace = "workspace://SpacesStore";
-
     Logger logger = LogManager.getLogger(TransactionTracker.class);
 
     @PostConstruct
@@ -67,8 +64,8 @@ public class TransactionTracker {
         eduSharingClient.refreshValuespaceCache();
 
         Transactions transactions = (lastTransactionId < 1)
-                ? client.getTransactions(0L,2000L,null,null, 1, TransactionTracker.storeWorkspace)
-                : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults, TransactionTracker.storeWorkspace );
+                ? client.getTransactions(0L,2000L,null,null, 1)
+                : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults);
 
         //initialize
         if(lastTransactionId < 1) lastTransactionId = transactions.getTransactions().get(0).getId();
