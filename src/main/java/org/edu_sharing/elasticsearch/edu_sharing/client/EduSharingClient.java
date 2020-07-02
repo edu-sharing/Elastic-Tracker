@@ -225,6 +225,7 @@ public class EduSharingClient {
         url = getUrl(url);
         MetadataSets mdss = client.target(url).
                 request(MediaType.APPLICATION_JSON).
+                header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword)).
                 get().readEntity(MetadataSets.class);
         return mdss;
     }
