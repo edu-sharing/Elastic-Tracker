@@ -59,6 +59,8 @@ public class EduSharingClient {
 
     String URL_MDS = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}";
 
+    String URL_MDS_ALL = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-";
+
     String URL_ABOUT = "/edu-sharing/rest/_about";
 
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
@@ -74,7 +76,15 @@ public class EduSharingClient {
 
     @PostConstruct
     public void init()  throws IOException {
-        valuespaceProps = getValuespaceProperties("-default-").toArray(new String[]{});
+
+        MetadataSets metadataSets = getMetadataSets();
+
+        Set<String> valueSpacePropsTmp = new HashSet<>();
+        for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
+            valueSpacePropsTmp.addAll(getValuespaceProperties(metadataSet.getId()));
+        }
+
+        valuespaceProps = valueSpacePropsTmp.toArray(new String[]{});
     }
 
     public String translate(String mds, String language, String property, String key){
@@ -208,6 +218,15 @@ public class EduSharingClient {
                 .request(MediaType.APPLICATION_JSON)
                 .get().readEntity(About.class);
         return about;
+    }
+
+    public MetadataSets getMetadataSets(){
+        String url = new String(URL_MDS_ALL);
+        url = getUrl(url);
+        MetadataSets mdss = client.target(url).
+                request(MediaType.APPLICATION_JSON).
+                get().readEntity(MetadataSets.class);
+        return mdss;
     }
 
 
