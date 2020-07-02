@@ -73,7 +73,7 @@ public class ElasticsearchClient {
     @PostConstruct
     public void init() throws IOException {
         createIndexIfNotExists(INDEX_TRANSACTIONS);
-        createIndexIfNotExists(INDEX_WORKSPACE);
+        createIndexWorkspace();
     }
 
     private void createIndexIfNotExists(String index) throws IOException{
@@ -85,6 +85,7 @@ public class ElasticsearchClient {
         }
         client.close();
     }
+    
 
     public void updateReader(long dbid, Reader reader) throws IOException {
         RestHighLevelClient client = getClient();
@@ -437,10 +438,14 @@ public class ElasticsearchClient {
      * @TODO
      * @throws IOException
      */
-    public void createIndex() throws IOException {
+    public void createIndexWorkspace() throws IOException {
+        RestHighLevelClient client = getClient();
         try {
-            RestHighLevelClient client = getClient();
+            GetIndexRequest request = new GetIndexRequest(INDEX_WORKSPACE);
 
+            if(client.indices().exists(request,RequestOptions.DEFAULT)){
+                return;
+            }
 
             CreateIndexRequest indexRequest = new CreateIndexRequest(INDEX_WORKSPACE);
 
@@ -453,24 +458,53 @@ public class ElasticsearchClient {
                     builder.startObject("aclId").field("type", "long").endObject();
                     builder.startObject("txnId").field("type", "long").endObject();
                     builder.startObject("dbid").field("type", "long").endObject();
-                    builder.startObject("nodeRef").field("type", "text").endObject();
-                    builder.startObject("owner").field("type", "text").endObject();
-                    builder.startObject("type").field("type", "text").endObject();
-                    builder.startObject("readers").field("type", "text").endObject();
-                    //builder.startObject("name").field("type", "text").endObject();
-                    //builder.startObject("keywords").field("type", "keyword").endObject();
+                    builder.startObject("nodeRef")
+                            .startObject("properties")
+                                .startObject("storeRef")
+                                    .startObject("properties")
+                                        .startObject("protocol").field("type","keyword").endObject()
+                                        .startObject("identifier").field("type","keyword").endObject()
+                                    .endObject()
+                                .endObject()
+                                .startObject("id").field("type","keyword").endObject()
+                            .endObject()
+                    .endObject();
+                    builder.startObject("owner").field("type","keyword").endObject();
+                    builder.startObject("type").field("type","keyword").endObject();
+                    //leave out i18n cause it is dynamic
+                    builder.startObject("path").field("type","keyword").endObject();
+                    builder.startObject("permissions")
+                            .startObject("properties")
+                                .startObject("read").field("type","keyword").endObject()
+                            .endObject()
+                    .endObject();
+                    //@TODO content
+                    builder.startObject("properties")
+                            .startObject("properties")
+                                .startObject("ccm:original").field("type","keyword").endObject()
+                                .startObject("cclom:location").field("type","keyword").endObject()
+                                .startObject("sys:node-uuid").field("type","keyword").endObject()
+                                .startObject("cclom:format").field("type","keyword").endObject()
+                                .startObject("cm:versionLabel").field("type","keyword").endObject()
+                                //the others are default
+                            .endObject()
+                    .endObject();
+                    builder.startObject("aspects").field("type","keyword").endObject();
+
                 }
                 builder.endObject();
             }
             builder.endObject();
 
             indexRequest.mapping(builder);
-
+            client.indices().create(indexRequest, RequestOptions.DEFAULT);
 
 
         }catch(Exception e) {
-            // index already exists
-            // throw new RuntimeException("Elastic search init failed",e);
+            logger.error(e.getMessage(),e);
+            throw e;
+        }finally {
+            client.close();
         }
     }
 
