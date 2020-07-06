@@ -184,7 +184,7 @@ public class EduSharingClient {
         entries = client
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
-                .header("Accept-Language",language)
+                .header("locale",language)
                 .header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword))
                 .post(Entity.json(params)).readEntity(ValuespaceEntries.class);
         addValuespaceToCache(mds, language, property, entries);
