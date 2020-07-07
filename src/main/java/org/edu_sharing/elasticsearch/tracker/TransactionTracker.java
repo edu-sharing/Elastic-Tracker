@@ -161,12 +161,18 @@ public class TransactionTracker {
         }
         try{
 
+            List<NodeData> toIndexUsages = nodeData
+                    .stream()
+                    .filter(n -> "ccm:usage".equals(n.getNodeMetadata().getType()))
+                    .collect(Collectors.toList());
+
             List<NodeData> toIndex = new ArrayList<NodeData>();
             for(NodeData data : nodeData){
 
                 if(allowedTypes != null && !allowedTypes.trim().equals("")){
                     String[] allowedTypesArray = allowedTypes.split(",");
                     String type = data.getNodeMetadata().getType();
+
                     if(!Arrays.asList(allowedTypesArray).contains(type)){
                         logger.debug("ignoring type:" + type);
                         continue;
@@ -179,6 +185,7 @@ public class TransactionTracker {
             }
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
+            for(NodeData usage : toIndexUsages) elasticClient.indexCollections(usage);
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
