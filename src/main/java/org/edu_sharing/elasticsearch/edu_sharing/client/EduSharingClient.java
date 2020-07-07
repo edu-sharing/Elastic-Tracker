@@ -63,6 +63,8 @@ public class EduSharingClient {
 
     String URL_ABOUT = "/edu-sharing/rest/_about";
 
+    String URL_REPOSITORIES = "/edu-sharing/rest/network/v1/repositories";
+
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
@@ -228,6 +230,19 @@ public class EduSharingClient {
                 header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword)).
                 get().readEntity(MetadataSets.class);
         return mdss;
+    }
+
+    public Repository getHomeRepository(){
+        String url = new String(URL_REPOSITORIES);
+        url = getUrl(url);
+        Repositories repositories = client.target(url).
+                request(MediaType.APPLICATION_JSON).
+                header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword)).
+                get().readEntity(Repositories.class);
+        for(Repository rep : repositories.getRepositories()){
+            if(rep.isHomeRepo()) return rep;
+        }
+        return null;
     }
 
 
