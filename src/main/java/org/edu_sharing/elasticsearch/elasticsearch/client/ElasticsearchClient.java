@@ -8,6 +8,7 @@ import org.edu_sharing.elasticsearch.alfresco.client.Node;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
 import org.edu_sharing.elasticsearch.alfresco.client.Reader;
+import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
@@ -32,8 +33,10 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -69,11 +72,16 @@ public class ElasticsearchClient {
 
     final static String ID_ACL_CHANGESET = "2";
 
+    String homeRepoId;
+
+    @Autowired
+    private EduSharingClient eduSharingClient;
 
     @PostConstruct
     public void init() throws IOException {
         createIndexIfNotExists(INDEX_TRANSACTIONS);
         createIndexWorkspace();
+        this.homeRepoId = eduSharingClient.getHomeRepository().getId();
     }
 
     private void createIndexIfNotExists(String index) throws IOException{
@@ -85,11 +93,15 @@ public class ElasticsearchClient {
         }
         client.close();
     }
-    
+
+    public void addCollection(NodeData usageNode){
+        String ccmNamespacePrefix = "{http://www.campuscontent.de/model/1.0}";
+        String propIONodeId = ccmNamespacePrefix + "usageparentnodeid";
+        String nodeIdIO = (String)usageNode.getNodeMetadata().getProperties().get(propIONodeId);
+        QueryBuilders.termQuery("noderef.id",nodeIdIO);
+    }
 
     public void updateReader(long dbid, Reader reader) throws IOException {
-        RestHighLevelClient client = getClient();
-
         XContentBuilder builder = XContentFactory.jsonBuilder();
         builder.startObject();
         {
@@ -98,9 +110,14 @@ public class ElasticsearchClient {
             builder.endObject();
         }
         builder.endObject();
+        this.update(dbid,builder);
+    }
+
+    public void update(long dbId, XContentBuilder builder) throws IOException{
+        RestHighLevelClient client = getClient();
         UpdateRequest request = new UpdateRequest(
                 INDEX_WORKSPACE,
-                Long.toString(dbid)).doc(builder);
+                Long.toString(dbId)).doc(builder);
         UpdateResponse updateResponse = client.update(
                 request, RequestOptions.DEFAULT);
         String index = updateResponse.getIndex();
@@ -117,6 +134,7 @@ public class ElasticsearchClient {
         }
         client.close();
     }
+
     public void index(List<NodeData> nodes) throws IOException{
         RestHighLevelClient client = getClient();
 
@@ -289,6 +307,74 @@ public class ElasticsearchClient {
 
         client.close();
 
+    }
+
+    public void indexCollections(NodeData usage) throws IOException{
+        String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
+        String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
+        String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
+
+        String nodeIdCollection = (String)usage.getNodeMetadata().getProperties().get(propertyUsageCourseId);
+        String nodeIdIO = (String)usage.getNodeMetadata().getProperties().get(propertyUsageParentNodeId);
+        String usageAppId = (String)usage.getNodeMetadata().getProperties().get(propertyUsageAppId);
+
+
+        //check if it is an collection usage
+        if(!homeRepoId.equals(usageAppId)){
+            return;
+        }
+
+        QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
+        QueryBuilder ioQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdIO);
+
+        SearchHits searchHitsCollection = this.search(INDEX_WORKSPACE,collectionQuery,0,1);
+        if(searchHitsCollection == null || searchHitsCollection.getTotalHits().value == 0){
+            logger.error("no collection found for: " + nodeIdCollection);
+            return;
+        }
+        SearchHit searchHitCollection = searchHitsCollection.getHits()[0];
+
+        SearchHits ioSearchHits = this.search(INDEX_WORKSPACE,ioQuery,0,1);
+        if(ioSearchHits == null || ioSearchHits.getTotalHits().value == 0){
+            logger.error("no io found for: " + nodeIdIO);
+            return;
+        }
+
+        SearchHit hitIO = ioSearchHits.getHits()[0];
+
+        Map propsIo = (Map)hitIO.getSourceAsMap().get("properties");
+        Map propsCollection = (Map)searchHitCollection.getSourceAsMap().get("properties");
+
+        logger.info("adding collection data: " + propsCollection.get("cm:name") +" "+propsCollection.get("sys:node-dbid") +" to IO: "+propsIo.get("cm:name") +" "+propsIo.get("sys:node-dbid"));
+
+        List<Map<String, Object>> collections = (List<Map<String, Object>>)ioSearchHits.getHits()[0].getSourceAsMap().get("collections");
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        builder.startObject();
+        {
+           builder.startArray("collections");
+                if(collections != null && collections.size() > 0){
+                    for(Map<String,Object> collection : collections){
+                        if(!searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"))){
+                            builder.startObject();
+                            for(Map.Entry<String,Object> entry : collection.entrySet()){
+                                builder.field(entry.getKey(),entry.getValue());
+                            }
+                            builder.endObject();
+                        }
+                    }
+                }
+
+                builder.startObject();
+                for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
+                    builder.field(entry.getKey(), entry.getValue());
+                }
+                builder.endObject();
+
+            builder.endArray();
+        }
+        builder.endObject();
+        int dbid = Integer.parseInt(hitIO.getId());
+        this.update(dbid,builder);
     }
 
     private String getMultilangValue(List listvalue){
