@@ -9,7 +9,6 @@ import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -72,13 +71,15 @@ public class TransactionTracker {
                 : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults);
 
         //initialize
-        if(lastTransactionId < 1) lastTransactionId = transactions.getTransactions().get(0).getId();
-
-        //step forward
-        if(transactions.getMaxTxnId() > (lastTransactionId + TransactionTracker.maxResults)){
-            lastTransactionId += TransactionTracker.maxResults;
-        }else{
-            lastTransactionId = transactions.getMaxTxnId();
+        if(lastTransactionId < 1){
+            lastTransactionId = transactions.getTransactions().get(0).getId();
+        }else {
+            //step forward
+            if (transactions.getMaxTxnId() > (lastTransactionId + TransactionTracker.maxResults)) {
+                lastTransactionId += TransactionTracker.maxResults;
+            } else {
+                lastTransactionId = transactions.getMaxTxnId();
+            }
         }
 
 
