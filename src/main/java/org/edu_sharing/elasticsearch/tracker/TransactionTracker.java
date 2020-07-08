@@ -184,9 +184,14 @@ public class TransactionTracker {
                 toIndex.add(data);
 
             }
+            elasticClient.beforeDeleteCleanupReferences(toDelete);
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
-            for(NodeData usage : toIndexUsages) elasticClient.indexCollections(usage);
+            /**
+             * refresh index so that collections will be found by cacheCollections process
+             */
+            elasticClient.refresh(ElasticsearchClient.INDEX_WORKSPACE);
+            for(NodeData usage : toIndexUsages) elasticClient.indexCollections(usage.getNodeMetadata());
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));

@@ -12,6 +12,7 @@ import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
+import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -309,14 +310,21 @@ public class ElasticsearchClient {
 
     }
 
-    public void indexCollections(NodeData usage) throws IOException{
+    public void refresh(String index) throws IOException{
+        RefreshRequest request = new RefreshRequest(index);
+        this.getClient().indices().refresh(request,RequestOptions.DEFAULT);
+    }
+
+    public void indexCollections(NodeMetadata usage) throws IOException{
         String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
         String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
         String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
+       // String propertyUsageDbid = "{http://www.alfresco.org/model/system/1.0}node-dbid";
 
-        String nodeIdCollection = (String)usage.getNodeMetadata().getProperties().get(propertyUsageCourseId);
-        String nodeIdIO = (String)usage.getNodeMetadata().getProperties().get(propertyUsageParentNodeId);
-        String usageAppId = (String)usage.getNodeMetadata().getProperties().get(propertyUsageAppId);
+        String nodeIdCollection = (String)usage.getProperties().get(propertyUsageCourseId);
+        String nodeIdIO = (String)usage.getProperties().get(propertyUsageParentNodeId);
+        String usageAppId = (String)usage.getProperties().get(propertyUsageAppId);
+        Long usageDbId = usage.getId();
 
 
         //check if it is an collection usage
@@ -345,7 +353,8 @@ public class ElasticsearchClient {
         Map propsIo = (Map)hitIO.getSourceAsMap().get("properties");
         Map propsCollection = (Map)searchHitCollection.getSourceAsMap().get("properties");
 
-        logger.info("adding collection data: " + propsCollection.get("cm:name") +" "+propsCollection.get("sys:node-dbid") +" to IO: "+propsIo.get("cm:name") +" "+propsIo.get("sys:node-dbid"));
+
+        logger.info("adding collection data: " + propsCollection.get("cm:name") +" "+propsCollection.get("sys:node-dbid") +" IO: "+propsIo.get("cm:name") +" "+propsIo.get("sys:node-dbid"));
 
         List<Map<String, Object>> collections = (List<Map<String, Object>>)ioSearchHits.getHits()[0].getSourceAsMap().get("collections");
         XContentBuilder builder = XContentFactory.jsonBuilder();
@@ -364,17 +373,84 @@ public class ElasticsearchClient {
                     }
                 }
 
+
                 builder.startObject();
                 for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
                     builder.field(entry.getKey(), entry.getValue());
                 }
+                builder.field("usagedbid",usageDbId);
                 builder.endObject();
+
 
             builder.endArray();
         }
         builder.endObject();
         int dbid = Integer.parseInt(hitIO.getId());
         this.update(dbid,builder);
+    }
+
+    /**
+     * checks if its a collection usage by searching for collections.usagedbid, and removes replicated collection object
+     * @param nodes
+     * @throws IOException
+     */
+    public void beforeDeleteCleanupReferences(List<Node> nodes) throws IOException{
+        for(Node node : nodes){
+
+            String collectionCheckAttribute = null;
+            /**
+             * try it is a usage
+             */
+            QueryBuilder queryUsage = QueryBuilders.termQuery("collections.usagedbid",node.getId());
+            SearchHits searchHitsIO = this.search(INDEX_WORKSPACE,queryUsage,0,1);
+            if(searchHitsIO.getTotalHits().value > 0){
+                collectionCheckAttribute = "usagedbid";
+            }
+
+            /**
+             * try it is an collection
+             */
+            if(collectionCheckAttribute == null) {
+                QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", node.getId());
+                searchHitsIO = this.search(INDEX_WORKSPACE, queryCollection, 0, 1);
+                if (searchHitsIO.getTotalHits().value > 0) {
+                    collectionCheckAttribute = "dbid";
+                }
+            }
+
+            //nothing to cleanup
+            if(collectionCheckAttribute == null){
+                logger.info("nothing to cleanup for " + node.getId());
+                continue;
+            }
+
+            logger.info("cleanup collection cause " + (collectionCheckAttribute.equals("dbid")? "collection deleted" : "usage deleted"));
+            SearchHit hitIO = searchHitsIO.getHits()[0];
+            List<Map<String, Object>> collections = (List<Map<String, Object>>)hitIO.getSourceAsMap().get("collections");
+            XContentBuilder builder = XContentFactory.jsonBuilder();
+            builder.startObject();
+            {
+                builder.startArray("collections");
+                if(collections != null && collections.size() > 0){
+                    for(Map<String,Object> collection : collections){
+                        long nodeDbId = node.getId();
+                        long collectionAttValue = (Long)collection.get(collectionCheckAttribute);
+                        if(nodeDbId != collectionAttValue){
+                            builder.startObject();
+                            for(Map.Entry<String,Object> entry : collection.entrySet()){
+                                builder.field(entry.getKey(),entry.getValue());
+                            }
+                            builder.endObject();
+                        }
+                    }
+                }
+                builder.endArray();
+            }
+            builder.endObject();
+            int dbid = Integer.parseInt(hitIO.getId());
+            this.update(dbid,builder);
+
+        }
     }
 
     private String getMultilangValue(List listvalue){
@@ -482,7 +558,7 @@ public class ElasticsearchClient {
         ACLChangeSet aclChangeSet = null;
         if(resp.isExists()) {
             aclChangeSet = new ACLChangeSet();
-            aclChangeSet.setAclChangeSetCommitTime((Long) resp.getSource().get("aclChangeSetCommitTime"));
+            aclChangeSet.setAclChangeSetCommitTime(Long.parseLong(resp.getSource().get("aclChangeSetCommitTime").toString()));
             aclChangeSet.setAclChangeSetId((int)resp.getSource().get("aclChangeSetId"));
         }
 
@@ -576,6 +652,15 @@ public class ElasticsearchClient {
                             .endObject()
                     .endObject();
                     builder.startObject("aspects").field("type","keyword").endObject();
+                    builder.startObject("collections")
+
+                            .startObject("properties")
+                                .startObject("dbid").field("type","long").endObject()
+                                .startObject("usagedbid").field("type","long").endObject()
+                                .startObject("aclId").field("type","long").endObject()
+                            .endObject()
+
+                    .endObject();
 
                 }
                 builder.endObject();
