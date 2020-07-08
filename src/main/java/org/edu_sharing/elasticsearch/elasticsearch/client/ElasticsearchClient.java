@@ -434,7 +434,7 @@ public class ElasticsearchClient {
                 if(collections != null && collections.size() > 0){
                     for(Map<String,Object> collection : collections){
                         long nodeDbId = node.getId();
-                        long collectionAttValue = (Long)collection.get(collectionCheckAttribute);
+                        long collectionAttValue = Long.parseLong(collection.get(collectionCheckAttribute).toString());
                         if(nodeDbId != collectionAttValue){
                             builder.startObject();
                             for(Map.Entry<String,Object> entry : collection.entrySet()){
