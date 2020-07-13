@@ -312,7 +312,12 @@ public class ElasticsearchClient {
 
     public void refresh(String index) throws IOException{
         RefreshRequest request = new RefreshRequest(index);
-        this.getClient().indices().refresh(request,RequestOptions.DEFAULT);
+        RestHighLevelClient client = getClient();
+        try {
+            client.indices().refresh(request, RequestOptions.DEFAULT);
+        }finally{
+            client.close();
+        }
     }
 
     public void indexCollections(NodeMetadata usage) throws IOException{
