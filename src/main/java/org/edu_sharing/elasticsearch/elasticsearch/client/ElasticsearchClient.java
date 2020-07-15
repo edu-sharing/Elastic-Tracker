@@ -741,7 +741,9 @@ public class ElasticsearchClient {
                                             RequestConfig.Builder requestConfigBuilder) {
                                         return requestConfigBuilder
                                                 .setConnectTimeout(elasticConnectTimeout)
-                                                .setSocketTimeout(elasticSocketTimeout);
+                                                .setSocketTimeout(elasticSocketTimeout)
+                                                .setConnectionRequestTimeout(elasticConnectionRequestTimeout);
+
                                     }
                                 }));
 
