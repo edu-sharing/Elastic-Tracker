@@ -2,6 +2,9 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 
 
 import org.apache.http.HttpHost;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
@@ -26,6 +29,7 @@ import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
@@ -60,6 +64,15 @@ public class ElasticsearchClient {
 
     @Value("${elastic.protocol}")
     String elasticProtocol;
+
+    @Value("${elastic.socketTimeout}")
+    int elasticSocketTimeout;
+
+    @Value("${elastic.connectTimeout}")
+    int elasticConnectTimeout;
+
+    @Value("${elastic.connectionRequestTimeout}")
+    int elasticConnectionRequestTimeout;
 
     Logger logger = LogManager.getLogger(ElasticsearchClient.class);
 
@@ -702,11 +715,37 @@ public class ElasticsearchClient {
     }
 
     RestHighLevelClient getClient(){
-      return new RestHighLevelClient(
+
+        RestHighLevelClient client = new RestHighLevelClient(
                 RestClient.builder(
                         new HttpHost(elasticHost, elasticPort, elasticProtocol)
                         //,new HttpHost("localhost", 9201, "http")
-                ));
+                )/*.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
+                        .setSocketTimeout(elasticSocketTimeout)
+                        .setConnectTimeout(elasticConnectTimeout)
+                        .setConnectionRequestTimeout(elasticConnectionRequestTimeout)));*/
+                        /*.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback(){
+                            @Override
+                            public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
+                                IOReactorConfig.Builder ioReactorConfigBuilder = IOReactorConfig.copy(IOReactorConfig.DEFAULT);
+                                ioReactorConfigBuilder = ioReactorConfigBuilder.setConnectTimeout(elasticConnectTimeout);
+                               // ioReactorConfigBuilder = ioReactorConfigBuilder.setSoTimeout(elasticSocketTimeout);
+                               // ioReactorConfigBuilder = ioReactorConfigBuilder.se
+                                return httpClientBuilder.setDefaultIOReactorConfig(ioReactorConfigBuilder.build());
+                            }
+                        })*/
+                        .setRequestConfigCallback(
+                                new RestClientBuilder.RequestConfigCallback() {
+                                    @Override
+                                    public RequestConfig.Builder customizeRequestConfig(
+                                            RequestConfig.Builder requestConfigBuilder) {
+                                        return requestConfigBuilder
+                                                .setConnectTimeout(elasticConnectTimeout)
+                                                .setSocketTimeout(elasticSocketTimeout);
+                                    }
+                                }));
+
+        return client;
     };
 
 
