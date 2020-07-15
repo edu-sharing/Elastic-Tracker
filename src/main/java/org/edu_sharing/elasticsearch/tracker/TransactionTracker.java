@@ -94,6 +94,7 @@ public class TransactionTracker {
             }else{
 
                 logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
+                return;
             }
 
 
