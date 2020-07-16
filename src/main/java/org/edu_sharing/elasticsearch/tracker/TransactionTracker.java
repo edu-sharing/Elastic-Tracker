@@ -70,34 +70,30 @@ public class TransactionTracker {
                 ? client.getTransactions(0L,2000L,null,null, 1)
                 : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults);
 
+        long newLastTransactionId = lastTransactionId;
         //initialize
-        if(lastTransactionId < 1){
-            lastTransactionId = transactions.getTransactions().get(0).getId();
+        if(newLastTransactionId < 1){
+            newLastTransactionId = transactions.getTransactions().get(0).getId();
         }else {
             //step forward
-            if (transactions.getMaxTxnId() > (lastTransactionId + TransactionTracker.maxResults)) {
-                lastTransactionId += TransactionTracker.maxResults;
+            if (transactions.getMaxTxnId() > (newLastTransactionId + TransactionTracker.maxResults)) {
+                newLastTransactionId += TransactionTracker.maxResults;
             } else {
-                lastTransactionId = transactions.getMaxTxnId();
+                newLastTransactionId = transactions.getMaxTxnId();
             }
         }
 
 
         if(transactions.getTransactions().size() == 0){
 
+            lastTransactionId = newLastTransactionId;
             if(transactions.getMaxTxnId() <= lastTransactionId){
                 logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
-                //+1 to prevent repeating the last transaction over and over
-                //not longer necessary when we remember last transaction id in idx
-                this.lastFromCommitTime = transactions.getMaxTxnCommitTime() + 1;
                 return;
             }else{
-
                 logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
                 return;
             }
-
-
         }
 
         Transaction first = transactions.getTransactions().get(0);
@@ -128,6 +124,7 @@ public class TransactionTracker {
                 .collect(Collectors.toList());
 
         if(nodes.size() == 0){
+            lastTransactionId = newLastTransactionId;
             return;
         }
 
@@ -196,6 +193,9 @@ public class TransactionTracker {
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
+            //set on success
+            lastTransactionId = newLastTransactionId;
+
             if(lastFromCommitTime > last.getCommitTimeMs()){
                 logger.info("reseting lastFromCommitTime old:" +lastFromCommitTime +" new "+last.getCommitTimeMs());
                 lastFromCommitTime = last.getCommitTimeMs() + 1;
