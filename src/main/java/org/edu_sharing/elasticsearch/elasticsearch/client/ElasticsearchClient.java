@@ -425,8 +425,8 @@ public class ElasticsearchClient {
             /**
              * try it is an collection
              */
+            QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", node.getId());
             if(collectionCheckAttribute == null) {
-                QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", node.getId());
                 searchHitsIO = this.search(INDEX_WORKSPACE, queryCollection, 0, 1);
                 if (searchHitsIO.getTotalHits().value > 0) {
                     collectionCheckAttribute = "dbid";
@@ -438,33 +438,37 @@ public class ElasticsearchClient {
                 logger.info("nothing to cleanup for " + node.getId());
                 continue;
             }
-
+            final String checkAtt = collectionCheckAttribute;
             logger.info("cleanup collection cause " + (collectionCheckAttribute.equals("dbid")? "collection deleted" : "usage deleted"));
-            for(SearchHit hitIO : searchHitsIO.getHits()) {
-                List<Map<String, Object>> collections = (List<Map<String, Object>>) hitIO.getSourceAsMap().get("collections");
-                XContentBuilder builder = XContentFactory.jsonBuilder();
-                builder.startObject();
-                {
-                    builder.startArray("collections");
-                    if (collections != null && collections.size() > 0) {
-                        for (Map<String, Object> collection : collections) {
-                            long nodeDbId = node.getId();
-                            long collectionAttValue = Long.parseLong(collection.get(collectionCheckAttribute).toString());
-                            if (nodeDbId != collectionAttValue) {
-                                builder.startObject();
-                                for (Map.Entry<String, Object> entry : collection.entrySet()) {
-                                    builder.field(entry.getKey(), entry.getValue());
+            new SearchHitsRunner(this){
+                @Override
+                public void execute(SearchHit hitIO) throws IOException {
+                    List<Map<String, Object>> collections = (List<Map<String, Object>>) hitIO.getSourceAsMap().get("collections");
+                    XContentBuilder builder = XContentFactory.jsonBuilder();
+                    builder.startObject();
+                    {
+                        builder.startArray("collections");
+                        if (collections != null && collections.size() > 0) {
+                            for (Map<String, Object> collection : collections) {
+                                long nodeDbId = node.getId();
+                                long collectionAttValue = Long.parseLong(collection.get(checkAtt).toString());
+                                if (nodeDbId != collectionAttValue) {
+                                    builder.startObject();
+                                    for (Map.Entry<String, Object> entry : collection.entrySet()) {
+                                        builder.field(entry.getKey(), entry.getValue());
+                                    }
+                                    builder.endObject();
                                 }
-                                builder.endObject();
                             }
                         }
+                        builder.endArray();
                     }
-                    builder.endArray();
+                    builder.endObject();
+                    int dbid = Integer.parseInt(hitIO.getId());
+                    this.elasticClient.update(dbid, builder);
                 }
-                builder.endObject();
-                int dbid = Integer.parseInt(hitIO.getId());
-                this.update(dbid, builder);
-            }
+            }.run(queryCollection);
+
 
         }
     }
