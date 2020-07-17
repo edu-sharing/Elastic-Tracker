@@ -96,6 +96,21 @@ public class TransactionTracker {
             }
         }
 
+        if(transactions.getTransactions().size() == 1){
+
+            try {
+               Tx txn = elasticClient.getTransaction();
+               long lastProcessedTxId = transactions.getTransactions().get(0).getId();
+               if(txn.getTxnId() == lastProcessedTxId){
+                   logger.info("nothing to do.");
+                   return;
+               }
+            } catch (IOException e) {
+                logger.error(e.getMessage(),e);
+                return;
+            }
+        }
+
         Transaction first = transactions.getTransactions().get(0);
         Transaction last = transactions.getTransactions().get(transactions.getTransactions().size() -1);
 
