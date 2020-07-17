@@ -197,7 +197,7 @@ public class TransactionTracker {
                 toIndex.add(data);
 
             }
-            elasticClient.beforeDeleteCleanupReferences(toDelete);
+            elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
             /**
