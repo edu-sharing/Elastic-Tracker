@@ -296,6 +296,10 @@ public class ElasticsearchClient {
                     logger.debug("created node in elastic:" + node);
                 } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
                     logger.debug("updated node in elastic:" + node);
+                    if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
+                        this.refresh(INDEX_WORKSPACE);
+                        onUpdateRefreshCollectionReplicas(nodeData.getNode());
+                    }
                 }
                 ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
                 if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
@@ -463,6 +467,52 @@ public class ElasticsearchClient {
             }
 
         }
+    }
+
+    private void onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
+        QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", nodeCollection.getId());
+        new SearchHitsRunner(this)
+        {
+            @Override
+            public void execute(SearchHit hit) throws IOException{
+                logger.info("updating collection data for:"+hit.getSourceAsMap().get("dbid"));
+                QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",Tools.getUUID(nodeCollection.getNodeRef()));
+                SearchHits searchHitsCollection = this.elasticClient.search(INDEX_WORKSPACE,collectionQuery,0,1);
+
+                if(searchHitsCollection == null || searchHitsCollection.getTotalHits().value == 0){
+                    return;
+                }
+
+                List<Map<String, Object>> collectionReplicas = (List<Map<String, Object>>) hit.getSourceAsMap().get("collections");
+                XContentBuilder builder = XContentFactory.jsonBuilder();
+                builder.startObject();
+                {
+                    builder.startArray("collections");
+
+                    for (Map<String, Object> collectionReplica : collectionReplicas) {
+                        long collReplDbid = ((Number)collectionReplica.get("dbid")).longValue();
+                        if (collReplDbid == nodeCollection.getId()) {
+                            builder.startObject();
+                            for(Map.Entry<String, Object> entry : searchHitsCollection.getHits()[0].getSourceAsMap().entrySet()){
+                                builder.field(entry.getKey(), entry.getValue());
+                            }
+                            builder.endObject();
+                        }else{
+                            builder.startObject();
+                            for (Map.Entry<String, Object> entry : collectionReplica.entrySet()) {
+                                builder.field(entry.getKey(), entry.getValue());
+                            }
+                            builder.endObject();
+                        }
+                    }
+
+                    builder.endArray();
+                }
+                builder.endObject();
+                int dbid = Integer.parseInt(hit.getId());
+                this.elasticClient.update(dbid, builder);
+            }
+        }.run(queryCollection);
     }
 
     private String getMultilangValue(List listvalue){
