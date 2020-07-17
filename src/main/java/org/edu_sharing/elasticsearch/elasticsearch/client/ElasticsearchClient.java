@@ -107,7 +107,6 @@ public class ElasticsearchClient {
         }
         client.close();
     }
-    
 
     public void updateReader(long dbid, Reader reader) throws IOException {
         XContentBuilder builder = XContentFactory.jsonBuilder();
@@ -406,7 +405,7 @@ public class ElasticsearchClient {
      * @param nodes
      * @throws IOException
      */
-    public void beforeDeleteCleanupReferences(List<Node> nodes) throws IOException{
+    public void beforeDeleteCleanupCollectionReplicas(List<Node> nodes) throws IOException{
         for(Node node : nodes){
 
             String collectionCheckAttribute = null;
@@ -437,30 +436,31 @@ public class ElasticsearchClient {
             }
 
             logger.info("cleanup collection cause " + (collectionCheckAttribute.equals("dbid")? "collection deleted" : "usage deleted"));
-            SearchHit hitIO = searchHitsIO.getHits()[0];
-            List<Map<String, Object>> collections = (List<Map<String, Object>>)hitIO.getSourceAsMap().get("collections");
-            XContentBuilder builder = XContentFactory.jsonBuilder();
-            builder.startObject();
-            {
-                builder.startArray("collections");
-                if(collections != null && collections.size() > 0){
-                    for(Map<String,Object> collection : collections){
-                        long nodeDbId = node.getId();
-                        long collectionAttValue = Long.parseLong(collection.get(collectionCheckAttribute).toString());
-                        if(nodeDbId != collectionAttValue){
-                            builder.startObject();
-                            for(Map.Entry<String,Object> entry : collection.entrySet()){
-                                builder.field(entry.getKey(),entry.getValue());
+            for(SearchHit hitIO : searchHitsIO.getHits()) {
+                List<Map<String, Object>> collections = (List<Map<String, Object>>) hitIO.getSourceAsMap().get("collections");
+                XContentBuilder builder = XContentFactory.jsonBuilder();
+                builder.startObject();
+                {
+                    builder.startArray("collections");
+                    if (collections != null && collections.size() > 0) {
+                        for (Map<String, Object> collection : collections) {
+                            long nodeDbId = node.getId();
+                            long collectionAttValue = Long.parseLong(collection.get(collectionCheckAttribute).toString());
+                            if (nodeDbId != collectionAttValue) {
+                                builder.startObject();
+                                for (Map.Entry<String, Object> entry : collection.entrySet()) {
+                                    builder.field(entry.getKey(), entry.getValue());
+                                }
+                                builder.endObject();
                             }
-                            builder.endObject();
                         }
                     }
+                    builder.endArray();
                 }
-                builder.endArray();
+                builder.endObject();
+                int dbid = Integer.parseInt(hitIO.getId());
+                this.update(dbid, builder);
             }
-            builder.endObject();
-            int dbid = Integer.parseInt(hitIO.getId());
-            this.update(dbid,builder);
 
         }
     }
