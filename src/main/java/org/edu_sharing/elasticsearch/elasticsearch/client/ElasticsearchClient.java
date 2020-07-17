@@ -551,7 +551,7 @@ public class ElasticsearchClient {
 
             transaction = new Tx();
             transaction.setTxnCommitTime((Long) resp.getSource().get("txnCommitTime"));
-            transaction.setTxnId((Integer) resp.getSource().get("txnId"));
+            transaction.setTxnId(((Number)resp.getSource().get("txnId")).longValue());
         }
 
         return transaction;
