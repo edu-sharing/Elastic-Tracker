@@ -107,13 +107,7 @@ public class ElasticsearchClient {
         }
         client.close();
     }
-
-    public void addCollection(NodeData usageNode){
-        String ccmNamespacePrefix = "{http://www.campuscontent.de/model/1.0}";
-        String propIONodeId = ccmNamespacePrefix + "usageparentnodeid";
-        String nodeIdIO = (String)usageNode.getNodeMetadata().getProperties().get(propIONodeId);
-        QueryBuilders.termQuery("noderef.id",nodeIdIO);
-    }
+    
 
     public void updateReader(long dbid, Reader reader) throws IOException {
         XContentBuilder builder = XContentFactory.jsonBuilder();
