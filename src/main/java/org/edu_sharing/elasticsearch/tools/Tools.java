@@ -26,4 +26,16 @@ public class Tools {
         return nodeRef.split("://")[1].split("/")[0];
     }
 
+    public static String getUUID(String nodeRef){
+        return nodeRef.split("://")[1].split("/")[1];
+    }
+
+    public static void main(String[] args) {
+        String nodeRef="workspace://SpacesStore/6738aac6-094b-438a-82b5-661ed6b4650b";
+        System.out.println("prot:"+Tools.getProtocol(nodeRef));
+        System.out.println("storeref:"+Tools.getStoreRef(nodeRef));
+        System.out.println("store identifier:"+Tools.getIdentifier(nodeRef));
+        System.out.println("uuid:"+Tools.getUUID(nodeRef));
+    }
+
 }
