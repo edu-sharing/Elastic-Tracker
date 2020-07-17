@@ -1,14 +1,14 @@
 package org.edu_sharing.elasticsearch.elasticsearch.client;
 
 public class Tx {
-    int txnId;
+    long txnId;
     long txnCommitTime;
 
-    public int getTxnId() {
+    public long getTxnId() {
         return txnId;
     }
 
-    public void setTxnId(int txnId) {
+    public void setTxnId(long txnId) {
         this.txnId = txnId;
     }
 
