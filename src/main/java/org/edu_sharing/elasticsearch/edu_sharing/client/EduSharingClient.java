@@ -91,6 +91,10 @@ public class EduSharingClient {
 
     public String translate(String mds, String language, String property, String key){
         ValuespaceEntries entries = getValuespace(mds,language,property);
+        if(entries.getError() != null){
+            logger.error("error:" + entries.getError() + " m:"+entries.getMessage());
+            return null;
+        }
         String result = null;
         for(ValuespaceEntry entry : entries.getValues()){
             if(entry.getKey().equals(key)){
@@ -106,7 +110,7 @@ public class EduSharingClient {
 
         String mds = (String)data.getNodeMetadata().getProperties().get(Constants.CM_PROP_EDUMETADATASET);
         if(mds == null) mds = "default";
-
+        
         for(Map.Entry<String, Serializable> prop : properties.entrySet()){
             String key = Constants.getValidLocalName(prop.getKey());
             if(key == null){
