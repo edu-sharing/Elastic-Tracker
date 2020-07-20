@@ -101,7 +101,7 @@ public class TransactionTracker {
             Tx txn = elasticClient.getTransaction();
             int size = transactions.getTransactions().size();
             long lastProcessedTxId = transactions.getTransactions().get(size -1).getId();
-            if(txn.getTxnId() == lastProcessedTxId){
+            if(txn != null && (txn.getTxnId() == lastProcessedTxId)){
                 logger.info("nothing to do.");
                 return;
             }
