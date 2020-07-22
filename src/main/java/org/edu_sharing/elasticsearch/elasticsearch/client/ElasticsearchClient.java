@@ -108,12 +108,14 @@ public class ElasticsearchClient {
         client.close();
     }
 
-    public void updateReader(long dbid, Reader reader) throws IOException {
+    public void updatePermissions(long dbid, Map<String,List<String>> permissions) throws IOException {
         XContentBuilder builder = XContentFactory.jsonBuilder();
         builder.startObject();
         {
             builder.startObject("permissions");
-            builder.field("read",reader.getReaders());
+            for(Map.Entry<String,List<String>> entry: permissions.entrySet()){
+                builder.field(entry.getKey(),entry.getValue());
+            }
             builder.endObject();
         }
         builder.endObject();

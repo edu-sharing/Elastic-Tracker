@@ -122,6 +122,8 @@ public class ACLTracker {
                 GetPermissionsParam grp = new GetPermissionsParam();
                 grp.setAclIds(Arrays.asList(new Long[]{acl.getId()}));
                 ReadersACL readers = client.getReader(grp);
+                AccessControlLists accessControlLists = client.getAccessControlLists(grp);
+
                 Reader reader = readers.getAclsReaders().get(0);
                 if(reader.getAclId() != acl.getId()){
                     logger.error("reader aclid:" + reader.getAclId() +" does not match " +acl.getId());
@@ -134,17 +136,46 @@ public class ACLTracker {
 
                     //List<String> elasticReader = ( List<String> )hit.getSourceAsMap().get("permissions.read");
                     HashMap elasticPermissions = (HashMap)hit.getSourceAsMap().get("permissions");
-                    List<String> elasticReader = ( List<String> ) elasticPermissions.get("read");
                     List<String> alfReader = reader.getReaders();
 
-                    Collections.sort(elasticReader);
                     Collections.sort(alfReader);
 
-                    if(!elasticReader.equals(alfReader)) {
-                        elasticClient.updateReader(dbid, reader);
-                        logger.info("readers updated for dbid:" + dbid);
+                    /**
+                     *  alfresco permissions
+                     */
+                    Map<String,List<String>> permissionsAlf = new HashMap<>();
+                    for(AccessControlEntry ace : accessControlLists.getAccessControlLists().get(0).getAces()) {
+                        List<String> authorities = permissionsAlf.get(ace.getPermission());
+                        if (authorities == null) {
+                            authorities = new ArrayList<>();
+                        }
+                        if (!authorities.contains(ace.getAuthority())) {
+                            authorities.add(ace.getAuthority());
+                        }
+                        Collections.sort(authorities);
+                        permissionsAlf.put(ace.getPermission(), authorities);
+                    }
+                    permissionsAlf.put("read",alfReader);
+                    //sort alf map keys:
+                    permissionsAlf = new TreeMap<>(permissionsAlf);
+
+                    /**
+                     * elastic permissions
+                     */
+                    Map<String,List<String>> permissionsElastic = new HashMap<>();
+                    for(Object key : elasticPermissions.keySet()){
+                        List<String> value = (List<String>)elasticPermissions.get(key);
+                        Collections.sort(value);
+                        permissionsElastic.put((String)key, value);
+                    }
+                    //sort elastic map keys:
+                    permissionsElastic = new TreeMap<>(permissionsElastic);
+
+                    if(!permissionsAlf.equals(permissionsElastic)) {
+                        elasticClient.updatePermissions(dbid, permissionsAlf);
+                        logger.info("permissions updated for dbid:" + dbid);
                     }else{
-                        logger.debug("readers did not change in elastic dbid:" +dbid);
+                        logger.debug("permissions did not change in elastic dbid:" +dbid);
                     }
                 }
             }
