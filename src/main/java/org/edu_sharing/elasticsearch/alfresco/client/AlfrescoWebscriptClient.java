@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.logging.Level;
@@ -41,6 +42,8 @@ public class AlfrescoWebscriptClient {
     String URL_ACLS = "/alfresco/s/api/solr/acls";
 
     String URL_CONTENT = "/alfresco/s/api/solr/textContent";
+
+    String URL_PERMISSIONS = "/alfresco/service/api/solr/permissions";
 
     org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
 
@@ -113,9 +116,9 @@ public class AlfrescoWebscriptClient {
           long aclId =  md.getAclId();
           acls.add(aclId);
         }
-        GetReadersParam getReadersParam = new GetReadersParam();
-        getReadersParam.setAclIds(new ArrayList<Long>(acls));
-        ReadersACL readersACL = this.getReader(getReadersParam);
+        GetPermissionsParam getPermissionsParam = new GetPermissionsParam();
+        getPermissionsParam.setAclIds(new ArrayList<Long>(acls));
+        ReadersACL readersACL = this.getReader(getPermissionsParam);
 
         List<NodeData> result = new ArrayList<>();
         for(NodeMetadata nodeMetadata : nmds.getNodes()){
@@ -128,15 +131,20 @@ public class AlfrescoWebscriptClient {
                 }
             }
 
-            for(Reader reader : readersACL.getAclsReaders())
+            for(Reader reader : readersACL.getAclsReaders()) {
                 if (nodeMetadata.getAclId() == reader.aclId) {
                     NodeData nodeData = new NodeData();
                     nodeData.setNodeMetadata(nodeMetadata);
                     nodeData.setReader(reader);
                     nodeData.setNode(node);
 
+                    GetPermissionsParam getAcls = new GetPermissionsParam();
+                    getAcls.setAclIds(Arrays.asList(new Long[]{nodeMetadata.getAclId()} ));
+                    nodeData.setAccessControlList(this.getAccessControlLists(getPermissionsParam).getAccessControlLists().get(0));
                     result.add(nodeData);
                 }
+            }
+
         }
 
         for(NodeData nodeData : result){
@@ -147,7 +155,7 @@ public class AlfrescoWebscriptClient {
         return result;
     }
 
-    public ReadersACL getReader(GetReadersParam param){
+    public ReadersACL getReader(GetPermissionsParam param){
         String url = getUrl(URL_ACL_READERS);
         ReadersACL readers = client.target(url)
                 .request(MediaType.APPLICATION_JSON)
@@ -202,6 +210,15 @@ public class AlfrescoWebscriptClient {
                 .post(Entity.json(param)).readEntity(Acls.class);
 
         return readers;
+    }
+
+
+    public AccessControlLists getAccessControlLists(GetPermissionsParam param){
+        String url = getUrl(URL_PERMISSIONS);
+        AccessControlLists accessControlLists = client.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.json(param)).readEntity(AccessControlLists.class);
+        return accessControlLists;
     }
 
 

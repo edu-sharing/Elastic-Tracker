@@ -196,6 +196,9 @@ public class ElasticsearchClient {
 
                     builder.startObject("permissions");
                     builder.field("read",nodeData.getReader().getReaders());
+                    for(Map.Entry<String,List<String>> entry : nodeData.getPermissions().entrySet()){
+                        builder.field(entry.getKey(),entry.getValue());
+                    }
                     builder.endObject();
 
                     //content

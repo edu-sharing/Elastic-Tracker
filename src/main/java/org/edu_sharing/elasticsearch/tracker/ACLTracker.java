@@ -6,12 +6,10 @@ import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ACLChangeSet;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
-import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -121,7 +119,7 @@ public class ACLTracker {
                 }
 
 
-                GetReadersParam grp = new GetReadersParam();
+                GetPermissionsParam grp = new GetPermissionsParam();
                 grp.setAclIds(Arrays.asList(new Long[]{acl.getId()}));
                 ReadersACL readers = client.getReader(grp);
                 Reader reader = readers.getAclsReaders().get(0);

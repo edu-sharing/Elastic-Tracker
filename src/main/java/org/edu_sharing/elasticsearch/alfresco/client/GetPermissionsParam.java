@@ -2,7 +2,7 @@ package org.edu_sharing.elasticsearch.alfresco.client;
 
 import java.util.List;
 
-public class GetReadersParam {
+public class GetPermissionsParam {
     List<Long> aclIds;
 
     public List<Long> getAclIds() {
