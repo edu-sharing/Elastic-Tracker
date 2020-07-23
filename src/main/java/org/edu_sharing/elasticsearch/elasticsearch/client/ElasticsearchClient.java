@@ -16,6 +16,9 @@ import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -144,8 +147,28 @@ public class ElasticsearchClient {
         client.close();
     }
 
-    public void index(List<NodeData> nodes) throws IOException{
+    public void updateBulk(List<UpdateRequest> updateRequests) throws IOException{
         RestHighLevelClient client = getClient();
+        BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
+        for(UpdateRequest updateRequest : updateRequests){
+            bulkRequest.add(updateRequest);
+        }
+        if(bulkRequest.numberOfActions() > 0){
+            BulkResponse response = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+            for(BulkItemResponse item : response.getItems()){
+                if(item.getFailure() != null){
+                    logger.error(item.getFailureMessage());
+                }
+            }
+        }
+    }
+
+    public void index(List<NodeData> nodes) throws IOException{
+        logger.info("starting");
+        RestHighLevelClient client = getClient();
+
+        BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
+        boolean useBulkUpdate = true;
 
         for(NodeData nodeData: nodes) {
             NodeMetadata node = nodeData.getNodeMetadata();
@@ -291,41 +314,74 @@ public class ElasticsearchClient {
                 builder.endObject();
 
 
+
+
                 IndexRequest indexRequest = new IndexRequest(INDEX_WORKSPACE)
                         .id(Long.toString(node.getId())).source(builder);
 
-                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                String index = indexResponse.getIndex();
-                String id = indexResponse.getId();
-                if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
-                    logger.debug("created node in elastic:" + node);
-                } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
-                    logger.debug("updated node in elastic:" + node);
-                    if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
-                        this.refresh(INDEX_WORKSPACE);
-                        onUpdateRefreshCollectionReplicas(nodeData.getNode());
+                if(useBulkUpdate){
+                    bulkRequest.add(indexRequest);
+                }else{
+                    IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+                    String index = indexResponse.getIndex();
+                    String id = indexResponse.getId();
+                    if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
+                        logger.debug("created node in elastic:" + node);
+                    } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
+                        logger.debug("updated node in elastic:" + node);
+                        if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
+                            this.refresh(INDEX_WORKSPACE);
+                            onUpdateRefreshCollectionReplicas(nodeData.getNode());
+                        }
+                    }
+                    ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
+                    if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
+                        logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
+                    }
+                    if (shardInfo.getFailed() > 0) {
+                        for (ReplicationResponse.ShardInfo.Failure failure :
+                                shardInfo.getFailures()) {
+                            String reason = failure.reason();
+                            logger.error(failure.nodeId() +" reason:"+reason);
+                        }
                     }
                 }
-                ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
-                if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-                    logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
-                }
-                if (shardInfo.getFailed() > 0) {
-                    for (ReplicationResponse.ShardInfo.Failure failure :
-                            shardInfo.getFailures()) {
-                        String reason = failure.reason();
-                        logger.error(failure.nodeId() +" reason:"+reason);
-                    }
-                }
-
-
         }
 
-        client.close();
+        if(useBulkUpdate && bulkRequest.numberOfActions() > 0) {
+            logger.info("starting bulk update:");
+            BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+            logger.info("finished bulk update:");
 
+            Map<Long,NodeData> collectionNodes = new HashMap<>();
+            for(NodeData nodeData: nodes) {
+                NodeMetadata node = nodeData.getNodeMetadata();
+                if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
+                    collectionNodes.put(node.getId(),nodeData);
+                }
+            }
+            logger.info("start RefreshCollectionReplicas");
+            this.refresh(INDEX_WORKSPACE);
+            for (BulkItemResponse item : bulkResponse.getItems()) {
+                if(item.isFailed()){
+                    logger.error("Failed indexing of " + item.getResponse().getId());
+                    continue;
+                }
+                Long dbId = Long.parseLong(item.getResponse().getId());
+                NodeData collectionData = collectionNodes.get(dbId);
+                if(collectionData != null){
+                    onUpdateRefreshCollectionReplicas(collectionData.getNode());
+                }
+            }
+            logger.info("finished RefreshCollectionReplicas");
+
+        }
+        client.close();
+        logger.info("returning");
     }
 
     public void refresh(String index) throws IOException{
+        logger.debug("starting");
         RefreshRequest request = new RefreshRequest(index);
         RestHighLevelClient client = getClient();
         try {
@@ -333,6 +389,7 @@ public class ElasticsearchClient {
         }finally{
             client.close();
         }
+        logger.debug("returning");
     }
 
     public void indexCollections(NodeMetadata usage) throws IOException{
@@ -415,9 +472,18 @@ public class ElasticsearchClient {
      * @throws IOException
      */
     public void beforeDeleteCleanupCollectionReplicas(List<Node> nodes) throws IOException{
+        logger.info("starting");
+
+        if(nodes.size() == 0){
+            logger.info("returning 0");
+            return;
+        }
+
+        List<UpdateRequest> updateRequests = new ArrayList<>();
         for(Node node : nodes){
 
             String collectionCheckAttribute = null;
+            QueryBuilder collectionCheckQuery = null;
             /**
              * try it is a usage
              */
@@ -425,6 +491,7 @@ public class ElasticsearchClient {
             SearchHits searchHitsIO = this.search(INDEX_WORKSPACE,queryUsage,0,1);
             if(searchHitsIO.getTotalHits().value > 0){
                 collectionCheckAttribute = "usagedbid";
+                collectionCheckQuery = queryUsage;
             }
 
             /**
@@ -435,12 +502,12 @@ public class ElasticsearchClient {
                 searchHitsIO = this.search(INDEX_WORKSPACE, queryCollection, 0, 1);
                 if (searchHitsIO.getTotalHits().value > 0) {
                     collectionCheckAttribute = "dbid";
+                    collectionCheckQuery = queryCollection;
                 }
             }
 
             //nothing to cleanup
             if(collectionCheckAttribute == null){
-                logger.info("nothing to cleanup for " + node.getId());
                 continue;
             }
             final String checkAtt = collectionCheckAttribute;
@@ -456,7 +523,13 @@ public class ElasticsearchClient {
                         if (collections != null && collections.size() > 0) {
                             for (Map<String, Object> collection : collections) {
                                 long nodeDbId = node.getId();
-                                long collectionAttValue = Long.parseLong(collection.get(checkAtt).toString());
+
+                                Object collCeckAttValue = collection.get(checkAtt);
+                                if(collCeckAttValue == null){
+                                    logger.error("replicated collection " + collection.get("dbid") + " does not have a property " + checkAtt +" will leave it out");
+                                    continue;
+                                }
+                                long collectionAttValue = Long.parseLong(collCeckAttValue.toString());
                                 if (nodeDbId != collectionAttValue) {
                                     builder.startObject();
                                     for (Map.Entry<String, Object> entry : collection.entrySet()) {
@@ -470,15 +543,25 @@ public class ElasticsearchClient {
                     }
                     builder.endObject();
                     int dbid = Integer.parseInt(hitIO.getId());
-                    this.elasticClient.update(dbid, builder);
+
+                    UpdateRequest request = new UpdateRequest(
+                            INDEX_WORKSPACE,
+                            Long.toString(dbid)).doc(builder);
+                    updateRequests.add(request);
                 }
-            }.run(queryCollection);
-
-
+            }.run(collectionCheckQuery);
         }
+        this.updateBulk(updateRequests);
+        logger.info("returning");
     }
 
+    /**
+     * update ios collection metdata, that are containted inside a collection
+     * @param nodeCollection
+     * @throws IOException
+     */
     private void onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
+        List<UpdateRequest> updateRequests = new ArrayList<>();
         QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", nodeCollection.getId());
         new SearchHitsRunner(this)
         {
@@ -519,9 +602,15 @@ public class ElasticsearchClient {
                 }
                 builder.endObject();
                 int dbid = Integer.parseInt(hit.getId());
-                this.elasticClient.update(dbid, builder);
+                UpdateRequest request = new UpdateRequest(
+                        INDEX_WORKSPACE,
+                        Long.toString(dbid)).doc(builder);
+                updateRequests.add(request);
+
             }
         }.run(queryCollection);
+
+        this.updateBulk(updateRequests);
     }
 
     private String getMultilangValue(List listvalue){
@@ -638,33 +727,29 @@ public class ElasticsearchClient {
 
 
     public void delete(List<Node> nodes) throws IOException {
+        logger.info("starting size:"+nodes.size());
         RestHighLevelClient client = getClient();
 
+        BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
         for(Node node : nodes){
 
             DeleteRequest request = new DeleteRequest(
                     INDEX_WORKSPACE,
                     Long.toString(node.getId()));
-            DeleteResponse deleteResponse = client.delete(
-                    request, RequestOptions.DEFAULT);
 
-            String index = deleteResponse.getIndex();
-            String id = deleteResponse.getId();
-            long version = deleteResponse.getVersion();
-            ReplicationResponse.ShardInfo shardInfo = deleteResponse.getShardInfo();
-            if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-                logger.debug("shardInfo.getTotal() != shardInfo.getSuccessful() index:" + index +" id:"+id + " version:"+version);
-            }
-            if (shardInfo.getFailed() > 0) {
-                for (ReplicationResponse.ShardInfo.Failure failure :
-                        shardInfo.getFailures()) {
-                    String reason = failure.reason();
-                    logger.error(reason + "index:" + index +" id:"+id +" version:"+version);
+            bulkRequest.add(request);
+        }
+        if(bulkRequest.numberOfActions() > 0){
+            BulkResponse response = client.bulk(bulkRequest,RequestOptions.DEFAULT);
+            for(BulkItemResponse item : response.getItems()){
+                if(item.getFailure() != null){
+                    logger.error(item.getFailureMessage());
                 }
             }
         }
 
         client.close();
+        logger.info("returning");
     }
 
     /**
