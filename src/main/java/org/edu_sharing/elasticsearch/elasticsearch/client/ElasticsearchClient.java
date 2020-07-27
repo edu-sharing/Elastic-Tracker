@@ -161,6 +161,7 @@ public class ElasticsearchClient {
                 }
             }
         }
+        client.close();
     }
 
     public void index(List<NodeData> nodes) throws IOException{
