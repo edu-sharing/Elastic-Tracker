@@ -277,7 +277,10 @@ public class ElasticsearchClient {
                             if( !listvalue.isEmpty() && listvalue.get(0) instanceof List){
                                 List<String> mvValue = new ArrayList<String>();
                                 for(Object l : listvalue){
-                                    mvValue.add(getMultilangValue((List)l));
+                                    String mlv = getMultilangValue((List)l);
+                                    if(mlv != null) {
+                                        mvValue.add(mlv);
+                                    }
                                 }
                                 if(mvValue.size() > 0){
                                     value = (Serializable) mvValue;
@@ -633,9 +636,11 @@ public class ElasticsearchClient {
             }
             if(value == null) value = defaultValue;
             return value;
-        }else {
+        }else if(listvalue.size() == 1){
             Map multilangValue = (Map) listvalue.get(0);
             return (String) multilangValue.get("value");
+        }else{
+            return null;
         }
     }
 
