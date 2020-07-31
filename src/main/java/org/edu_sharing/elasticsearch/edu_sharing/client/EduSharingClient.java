@@ -40,7 +40,7 @@ public class EduSharingClient {
     String alfrescoPassword;
 
 
-    String[] valuespaceProps;
+    Map<String,Set<String>> valuespaceProps = new HashMap<>();
 
     @Value("${valuespace.languages}")
     String[] valuespaceLanguages;
@@ -81,12 +81,12 @@ public class EduSharingClient {
 
         MetadataSets metadataSets = getMetadataSets();
 
-        Set<String> valueSpacePropsTmp = new HashSet<>();
-        for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
-            valueSpacePropsTmp.addAll(getValuespaceProperties(metadataSet.getId()));
-        }
 
-        valuespaceProps = valueSpacePropsTmp.toArray(new String[]{});
+        for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
+            Set<String> valueSpacePropsTmp = new HashSet<>();
+            valueSpacePropsTmp.addAll(getValuespaceProperties(metadataSet.getId()));
+            valuespaceProps.put(metadataSet.getId(),valueSpacePropsTmp);
+        }
     }
 
     public String translate(String mds, String language, String property, String key){
@@ -118,7 +118,12 @@ public class EduSharingClient {
                 continue;
             }
 
-            if(Arrays.asList(valuespaceProps).contains(key)){
+            Set<String> valueSpacePropsMds = valuespaceProps.get(mds);
+            if(valueSpacePropsMds == null){
+                logger.error("no i18n props found for mds:"+mds);
+                continue;
+            }
+            if(valueSpacePropsMds.contains(key)){
                 for(String language : valuespaceLanguages) {
                     Serializable translated = null;
 
