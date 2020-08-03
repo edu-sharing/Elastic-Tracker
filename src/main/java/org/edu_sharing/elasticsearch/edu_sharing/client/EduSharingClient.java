@@ -80,12 +80,11 @@ public class EduSharingClient {
     public void init()  throws IOException {
 
         MetadataSets metadataSets = getMetadataSets();
-
-
         for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
             Set<String> valueSpacePropsTmp = new HashSet<>();
             valueSpacePropsTmp.addAll(getValuespaceProperties(metadataSet.getId()));
             valuespaceProps.put(metadataSet.getId(),valueSpacePropsTmp);
+            logger.info("added " + valueSpacePropsTmp.size() +" for mds " + metadataSet.getId());
         }
     }
 
@@ -110,7 +109,18 @@ public class EduSharingClient {
 
         String mds = (String)data.getNodeMetadata().getProperties().get(Constants.CM_PROP_EDUMETADATASET);
         if(mds == null) mds = "default";
-        
+
+        if(mds.equals("default")){
+            //"default" in repo is hard coded, should map on the first registered mds in repo
+            mds = valuespaceProps.keySet().iterator().next();
+        }
+
+        Set<String> valueSpacePropsMds = valuespaceProps.get(mds);
+        if(valueSpacePropsMds == null){
+            logger.error("no i18n props found for mds:" + mds);
+            return;
+        }
+
         for(Map.Entry<String, Serializable> prop : properties.entrySet()){
             String key = Constants.getValidLocalName(prop.getKey());
             if(key == null){
@@ -118,11 +128,7 @@ public class EduSharingClient {
                 continue;
             }
 
-            Set<String> valueSpacePropsMds = valuespaceProps.get(mds);
-            if(valueSpacePropsMds == null){
-                logger.error("no i18n props found for mds:"+mds);
-                continue;
-            }
+
             if(valueSpacePropsMds.contains(key)){
                 for(String language : valuespaceLanguages) {
                     Serializable translated = null;
