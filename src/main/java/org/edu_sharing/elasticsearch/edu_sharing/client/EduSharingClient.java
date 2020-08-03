@@ -84,7 +84,7 @@ public class EduSharingClient {
             Set<String> valueSpacePropsTmp = new HashSet<>();
             valueSpacePropsTmp.addAll(getValuespaceProperties(metadataSet.getId()));
             valuespaceProps.put(metadataSet.getId(),valueSpacePropsTmp);
-            logger.info("added " + valueSpacePropsTmp.size() +" for mds " + metadataSet.getId());
+            logger.info("added " + valueSpacePropsTmp.size() +" i18n props for mds: " + metadataSet.getId());
         }
     }
 
