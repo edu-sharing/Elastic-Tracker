@@ -301,6 +301,13 @@ public class ElasticsearchClient {
                             }
                         }
 
+                        //elastic maps this on date field, it gets a  failed to parse field exception when it's empty
+                        if("ccm:replicationsourcetimestamp".equals(key)){
+                            if(value != null && value.toString().trim().equals("")){
+                                value = null;
+                            }
+                        }
+
                         if(value != null) {
 
                             try {
@@ -368,6 +375,7 @@ public class ElasticsearchClient {
             this.refresh(INDEX_WORKSPACE);
             for (BulkItemResponse item : bulkResponse.getItems()) {
                 if(item.isFailed()){
+
                     logger.error("Failed indexing of " + item.getResponse().getId());
                     continue;
                 }
