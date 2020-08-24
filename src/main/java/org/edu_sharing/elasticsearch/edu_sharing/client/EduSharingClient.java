@@ -1,5 +1,6 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.apache.logging.log4j.LogManager;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
@@ -230,11 +232,16 @@ public class EduSharingClient {
     public About getAbout(){
         String url = new String(URL_ABOUT);
         url = getUrl(url);
-        About about = client
-                .target(url)
-                .request(MediaType.APPLICATION_JSON)
-                .get().readEntity(About.class);
-        return about;
+        try {
+            About about = client
+                    .target(url)
+                    .request(MediaType.APPLICATION_JSON)
+                    .get().readEntity(About.class);
+            return about;
+        } catch(ProcessingException e){
+            logger.error("Error while trying to fetch edu-sharing API at " + url + ". Make sure you're running edu-sharing >= 6.0", e);
+            throw e;
+        }
     }
 
     public MetadataSets getMetadataSets(){
