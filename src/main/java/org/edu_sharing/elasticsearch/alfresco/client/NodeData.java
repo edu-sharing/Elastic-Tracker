@@ -8,7 +8,6 @@ import java.util.Map;
 public class NodeData {
     NodeMetadata nodeMetadata;
     Reader reader;
-    Node node;
     String fullText;
 
     Map<String,List<String>> permissions;
@@ -30,14 +29,6 @@ public class NodeData {
 
     public void setReader(Reader reader) {
         this.reader = reader;
-    }
-
-    public Node getNode() {
-        return node;
-    }
-
-    public void setNode(Node node) {
-        this.node = node;
     }
 
     public Map<String, Map<String, List<String>>> getValueSpaces() {

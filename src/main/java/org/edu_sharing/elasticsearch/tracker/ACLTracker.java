@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class ACLTracker {
@@ -59,7 +60,7 @@ public class ACLTracker {
         }
     }
 
-    public void track() {
+    public boolean track() {
         logger.info("starting lastACLChangeSetId:" + lastACLChangeSetId + " lastFromCommitTime:" + lastFromCommitTime + " " + new Date(lastFromCommitTime));
 
 
@@ -86,12 +87,10 @@ public class ACLTracker {
                 //+1 to prevent repeating the last transaction over and over
                 //not longer necessary when we remember last transaction id in idx
                 this.lastFromCommitTime = aclChangeSets.getMaxChangeSetId() + 1;
-                return;
             } else {
-
                 logger.info("did not found new aclchangesets in last aclchangeset block from:" + (lastACLChangeSetId - ACLTracker.maxResults) + " to:" + lastACLChangeSetId + " MaxChangeSetId:" +aclChangeSets.getMaxChangeSetId());
-                return;
             }
+            return false;
         }
 
         AclChangeSet first = aclChangeSets.getAclChangeSets().get(0);
@@ -109,11 +108,12 @@ public class ACLTracker {
 
         try {
             Acls acls = client.getAcls(param);
-
+            List<SearchHit> searchHits = elasticClient.searchForAclIds(acls.getAcls().stream().map(Acl::getId).collect(Collectors.toList()));
             for (Acl acl : acls.getAcls()) {
-                SearchHits searchHits = elasticClient.searchForAclId(acl.getId());
-
-                if(searchHits.getHits() == null || searchHits.getHits().length == 0){
+                List<SearchHit> hits = searchHits.stream().filter((h) ->
+                        h.getSourceAsMap().get("aclId").equals(acl.getId())
+                ).collect(Collectors.toList());
+                if(hits.size() == 0){
                     logger.info("no nodes found in index for aclid:" +acl.getId());
                     continue;
                 }
@@ -130,7 +130,7 @@ public class ACLTracker {
                     continue;
                 }
 
-                for (SearchHit hit : searchHits.getHits()) {
+                for (SearchHit hit : hits) {
 
                     int dbid = (int)hit.getSourceAsMap().get("dbid");
 
@@ -187,5 +187,6 @@ public class ACLTracker {
 
 
         logger.info("finished lastACLChangeSetId:" + last.getId());
+        return true;
     }
 }

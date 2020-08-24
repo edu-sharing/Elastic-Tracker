@@ -3,24 +3,21 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 
 import org.apache.http.HttpHost;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
-import org.edu_sharing.elasticsearch.alfresco.client.Reader;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
-import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -39,6 +36,7 @@ import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
@@ -93,14 +91,23 @@ public class ElasticsearchClient {
 
     @Autowired
     private EduSharingClient eduSharingClient;
+    private int nodeCounter;
+    private long lastNodeCount = System.currentTimeMillis();
 
     @PostConstruct
     public void init() throws IOException {
+        deleteIndex(INDEX_TRANSACTIONS);
+        deleteIndex(INDEX_WORKSPACE);
         createIndexIfNotExists(INDEX_TRANSACTIONS);
         createIndexWorkspace();
         this.homeRepoId = eduSharingClient.getHomeRepository().getId();
     }
-
+    private void deleteIndex(String index) throws IOException{
+        DeleteIndexRequest request = new DeleteIndexRequest(index);
+        RestHighLevelClient client = getClient();
+        client.indices().delete(request, RequestOptions.DEFAULT);
+        client.close();
+    }
     private void createIndexIfNotExists(String index) throws IOException{
         GetIndexRequest request = new GetIndexRequest(index);
         RestHighLevelClient client = getClient();
@@ -342,7 +349,7 @@ public class ElasticsearchClient {
                         logger.debug("updated node in elastic:" + node);
                         if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
                             this.refresh(INDEX_WORKSPACE);
-                            onUpdateRefreshCollectionReplicas(nodeData.getNode());
+                            onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
                         }
                     }
                     ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
@@ -357,6 +364,11 @@ public class ElasticsearchClient {
                         }
                     }
                 }
+                if(nodeCounter++%100 == 0){
+                    logger.info("Processed " + nodeCounter +" nodes (" + (System.currentTimeMillis() - lastNodeCount) + "ms per last 100 nodes)");
+                    lastNodeCount = System.currentTimeMillis();
+                }
+
         }
 
         if(useBulkUpdate && bulkRequest.numberOfActions() > 0) {
@@ -375,14 +387,17 @@ public class ElasticsearchClient {
             this.refresh(INDEX_WORKSPACE);
             for (BulkItemResponse item : bulkResponse.getItems()) {
                 if(item.isFailed()){
-
-                    logger.error("Failed indexing of " + item.getResponse().getId());
+                    if(item.getResponse()!=null) {
+                        logger.error("Failed indexing of " + item.getResponse().getId());
+                    } else{
+                        logger.error("Failed indexing of null response");
+                    }
                     continue;
                 }
                 Long dbId = Long.parseLong(item.getResponse().getId());
                 NodeData collectionData = collectionNodes.get(dbId);
                 if(collectionData != null){
-                    onUpdateRefreshCollectionReplicas(collectionData.getNode());
+                    onUpdateRefreshCollectionReplicas(collectionData.getNodeMetadata());
                 }
             }
             logger.info("finished RefreshCollectionReplicas");
@@ -572,7 +587,7 @@ public class ElasticsearchClient {
      * @param nodeCollection
      * @throws IOException
      */
-    private void onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
+    private void onUpdateRefreshCollectionReplicas(NodeMetadata nodeCollection) throws IOException {
         List<UpdateRequest> updateRequests = new ArrayList<>();
         QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", nodeCollection.getId());
         new SearchHitsRunner(this)
@@ -851,6 +866,20 @@ public class ElasticsearchClient {
 
     public SearchHits searchForAclId(long acl) throws IOException {
         return this.search(INDEX_WORKSPACE, QueryBuilders.termQuery("aclId", acl), 0, 10000);
+    }
+
+    public List<SearchHit> searchForAclIds(List<Long> aclIds) throws IOException {
+        List<SearchHit> result = new ArrayList<>();
+        // paritionate to prevent maxClauseCount errors in elastic
+        for(int i=0;i<aclIds.size();i+=500){
+            BoolQueryBuilder query = QueryBuilders.boolQuery().minimumShouldMatch(1);
+            for(Long aclId: aclIds.subList(i, Math.min(aclIds.size(), i + 500))) {
+                query.should(QueryBuilders.termQuery("aclId", aclId));
+            }
+            SearchHits hits = this.search(INDEX_WORKSPACE, query, 0, aclIds.size());
+            result.addAll(Arrays.asList(hits.getHits()));
+        }
+        return result;
     }
 
     public SearchHits search(String index, QueryBuilder queryBuilder, int from, int size) throws IOException {
