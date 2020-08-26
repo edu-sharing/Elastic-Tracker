@@ -284,6 +284,10 @@ public class ElasticsearchClient {
                                 }
                                 if(mvValue.size() > 0){
                                     value = (Serializable) mvValue;
+                                }//fix: mapper_parsing_exception Preview of field's value: '{locale=de_}']] (empty keyword)
+                                else{
+                                    logger.info("fallback to \\”\\” for prop "+key +" v:" + value);
+                                    value = "";
                                 }
                             }
                         }
@@ -371,21 +375,37 @@ public class ElasticsearchClient {
                     collectionNodes.put(node.getId(),nodeData);
                 }
             }
-            logger.info("start RefreshCollectionReplicas");
+            logger.info("start refresh index");
             this.refresh(INDEX_WORKSPACE);
-            for (BulkItemResponse item : bulkResponse.getItems()) {
-                if(item.isFailed()){
+            try {
+                logger.info("start RefreshCollectionReplicas");
+                for (BulkItemResponse item : bulkResponse.getItems()) {
+                    if (item.isFailed()) {
 
-                    logger.error("Failed indexing of " + item.getResponse().getId());
-                    continue;
+                        if(item.getResponse() != null){
+                            logger.error("Failed indexing of " + item.getResponse().getId());
+                        }else{
+                            BulkItemResponse bir = (BulkItemResponse)item;
+                            if(bir.getFailure() != null){
+                                logger.error(bir.getFailure().getCause());
+                            }
+                            logger.error("Failed indexing of " + bir.getFailureMessage());
+                        }
+
+                        logger.error("Failed indexing of " + ((item.getResponse() == null) ? item : item.getResponse().getId()));
+                        continue;
+                    }
+                    Long dbId = Long.parseLong(item.getResponse().getId());
+                    NodeData collectionData = collectionNodes.get(dbId);
+                    if (collectionData != null) {
+                        onUpdateRefreshCollectionReplicas(collectionData.getNode());
+                    }
                 }
-                Long dbId = Long.parseLong(item.getResponse().getId());
-                NodeData collectionData = collectionNodes.get(dbId);
-                if(collectionData != null){
-                    onUpdateRefreshCollectionReplicas(collectionData.getNode());
-                }
+                logger.info("finished RefreshCollectionReplicas");
+            }catch(Throwable e){
+                logger.error(e.getMessage(),e);
+                throw e;
             }
-            logger.info("finished RefreshCollectionReplicas");
 
         }
         client.close();
@@ -638,7 +658,7 @@ public class ElasticsearchClient {
                     throw new RuntimeException("language map has only one value");
                 }
                 defaultValue = (String)m.get("value");
-                if("de".equals(m.get("locale"))){
+                if("de".equals(m.get("locale")) || "de_".equals(m.get("locale"))){
                     value = (String)m.get("value");
                 }
             }
