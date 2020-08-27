@@ -7,10 +7,7 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.edu_sharing.elasticsearch.alfresco.client.Node;
-import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
-import org.edu_sharing.elasticsearch.alfresco.client.NodeMetadata;
-import org.edu_sharing.elasticsearch.alfresco.client.Reader;
+import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
@@ -93,6 +90,9 @@ public class ElasticsearchClient {
 
     @Autowired
     private EduSharingClient eduSharingClient;
+
+    @Autowired
+    private AlfrescoWebscriptClient alfrescoClient;
 
     @PostConstruct
     public void init() throws IOException {
@@ -496,6 +496,7 @@ public class ElasticsearchClient {
         builder.endObject();
         int dbid = Integer.parseInt(hitIO.getId());
         this.update(dbid,builder);
+        this.refresh(INDEX_WORKSPACE);
     }
 
     /**
@@ -591,8 +592,10 @@ public class ElasticsearchClient {
      * update ios collection metdata, that are containted inside a collection
      * @param nodeCollection
      * @throws IOException
+     *
+     * @deprecated
      */
-    private void onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
+    private void _onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
         List<UpdateRequest> updateRequests = new ArrayList<>();
         QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", nodeCollection.getId());
         new SearchHitsRunner(this)
@@ -643,6 +646,29 @@ public class ElasticsearchClient {
         }.run(queryCollection);
 
         this.updateBulk(updateRequests);
+    }
+
+    private void onUpdateRefreshCollectionReplicas(Node nodeCollection) throws IOException {
+
+       //find usages for collection
+        QueryBuilder queryUsages = QueryBuilders.termQuery("properties.ccm:usagecourseid.keyword", Tools.getUUID(nodeCollection.getNodeRef()));
+        new SearchHitsRunner(this){
+
+            @Override
+            public void execute(SearchHit hit) throws IOException {
+                long usageDbId = ((Number)hit.getSourceAsMap().get("dbid")).longValue();
+                GetNodeMetadataParam param = new GetNodeMetadataParam();
+                param.setNodeIds(Arrays.asList(new Long[]{usageDbId}));
+                NodeMetadatas nodeMetadatas = alfrescoClient.getNodeMetadata(param);
+                if(nodeMetadatas == null || nodeMetadatas.getNodes() == null || nodeMetadatas.getNodes().size() == 0){
+                    logger.error("could not find usage object in alfresco with dbid:" + usageDbId);
+                    return;
+                }
+                NodeMetadata usage = nodeMetadatas.getNodes().get(0);
+                logger.info("running indexCollections for usage: " + usageDbId);
+                indexCollections(usage);
+            }
+        }.run(queryUsages);
     }
 
     private String getMultilangValue(List listvalue){
