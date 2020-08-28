@@ -40,7 +40,7 @@ public class TransactionTracker {
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
 
-    final static int maxResults = 1000;
+    final static int maxResults = 500;
 
     Logger logger = LogManager.getLogger(TransactionTracker.class);
 
@@ -67,7 +67,7 @@ public class TransactionTracker {
         eduSharingClient.refreshValuespaceCache();
 
         Transactions transactions = (lastTransactionId < 1)
-                ? client.getTransactions(0L,2000L,null,null, 1)
+                ? client.getTransactions(0L,500L,null,null, 1)
                 : client.getTransactions(lastTransactionId, lastTransactionId + TransactionTracker.maxResults, null, null, TransactionTracker.maxResults);
 
         long newLastTransactionId = lastTransactionId;
