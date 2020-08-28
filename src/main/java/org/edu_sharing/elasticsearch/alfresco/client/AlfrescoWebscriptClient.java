@@ -114,6 +114,10 @@ public class AlfrescoWebscriptClient {
     }
     public List<NodeData> getNodeData(List<NodeMetadata> nodes){
 
+        if(nodes == null || nodes.size() == 0){
+            return new ArrayList<>();
+        }
+
         LinkedHashSet<Long> acls = new LinkedHashSet<>();
         for(NodeMetadata md : nodes){
           long aclId =  md.getAclId();
