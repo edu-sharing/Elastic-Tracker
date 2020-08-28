@@ -35,7 +35,7 @@ public class ACLTracker {
     long lastFromCommitTime = -1;
     long lastACLChangeSetId = -1;
 
-    final static int maxResults = 1000;
+    final static int maxResults = 500;
 
     @Value("${tracker.timestep:36000000}")
     int nextTimeStep;
@@ -65,7 +65,7 @@ public class ACLTracker {
 
 
         AclChangeSets aclChangeSets = (lastACLChangeSetId < 1)
-                ? client.getAclChangeSets(0L, 2000L, 1)
+                ? client.getAclChangeSets(0L, 500L, 1)
                 : client.getAclChangeSets(lastACLChangeSetId, lastACLChangeSetId + ACLTracker.maxResults, ACLTracker.maxResults);
 
 
