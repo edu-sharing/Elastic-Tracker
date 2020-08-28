@@ -99,7 +99,6 @@ public class TransactionTracker {
 
         try {
             Tx txn = elasticClient.getTransaction();
-            int size = transactions.getTransactions().size();
             //long lastProcessedTxId = transactions.getTransactions().get(size -1).getId();
             if(txn != null && (txn.getTxnId() == transactions.getMaxTxnId())){
                 logger.info("nothing to do.");

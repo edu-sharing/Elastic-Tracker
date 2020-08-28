@@ -96,6 +96,18 @@ public class ACLTracker {
         AclChangeSet first = aclChangeSets.getAclChangeSets().get(0);
         AclChangeSet last = aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() - 1);
 
+        try {
+            ACLChangeSet aclChangeSet = elasticClient.getACLChangeSet();
+            if(aclChangeSet != null && (aclChangeSet.getAclChangeSetId() == aclChangeSets.getMaxChangeSetId())){
+                logger.info("nothing to do.");
+                return false;
+            }
+        } catch (IOException e) {
+            logger.error(e.getMessage(),e);
+            return false;
+        }
+
+
         if (lastFromCommitTime < 1) {
             this.lastFromCommitTime = last.getCommitTimeMs();
         }
@@ -117,7 +129,6 @@ public class ACLTracker {
                     logger.info("no nodes found in index for aclid:" +acl.getId());
                     continue;
                 }
-
 
                 GetPermissionsParam grp = new GetPermissionsParam();
                 grp.setAclIds(Arrays.asList(new Long[]{acl.getId()}));
