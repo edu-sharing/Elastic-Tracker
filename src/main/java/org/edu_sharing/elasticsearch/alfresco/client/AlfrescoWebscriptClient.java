@@ -98,8 +98,7 @@ public class AlfrescoWebscriptClient {
             return nmds;
         }
     }
-
-    public List<NodeData> getNodeData(List<Node> nodes){
+    public List<NodeMetadata> getNodeMetadata(List<Node> nodes){
 
         List<Long> dbnodeids = new ArrayList<>();
         for(Node node : nodes){
@@ -110,9 +109,13 @@ public class AlfrescoWebscriptClient {
         getNodeMetadataParam.setNodeIds(dbnodeids);
 
         NodeMetadatas nmds = getNodeMetadata(getNodeMetadataParam);
+        return nmds.getNodes();
 
-        LinkedHashSet<Long> acls = new LinkedHashSet<Long>();
-        for(NodeMetadata md : nmds.getNodes()){
+    }
+    public List<NodeData> getNodeData(List<NodeMetadata> nodes){
+
+        LinkedHashSet<Long> acls = new LinkedHashSet<>();
+        for(NodeMetadata md : nodes){
           long aclId =  md.getAclId();
           acls.add(aclId);
         }
@@ -121,22 +124,15 @@ public class AlfrescoWebscriptClient {
         ReadersACL readersACL = this.getReader(getPermissionsParam);
 
         List<NodeData> result = new ArrayList<>();
-        for(NodeMetadata nodeMetadata : nmds.getNodes()){
+        for(NodeMetadata nodeMetadata : nodes){
 
-            Node node = null;
-
-            for(Node n : nodes){
-                if(n.getId() == nodeMetadata.getId()){
-                    node = n;
-                }
-            }
+            NodeMetadata node = null;
 
             for(Reader reader : readersACL.getAclsReaders()) {
                 if (nodeMetadata.getAclId() == reader.aclId) {
                     NodeData nodeData = new NodeData();
                     nodeData.setNodeMetadata(nodeMetadata);
                     nodeData.setReader(reader);
-                    nodeData.setNode(node);
 
                     GetPermissionsParam getAcls = new GetPermissionsParam();
                     getAcls.setAclIds(Arrays.asList(new Long[]{nodeMetadata.getAclId()} ));
@@ -148,7 +144,7 @@ public class AlfrescoWebscriptClient {
         }
 
         for(NodeData nodeData : result){
-            String fullText = getTextContent(nodeData.getNode().getId());
+            String fullText = getTextContent(nodeData.getNodeMetadata().getId());
             if(fullText != null) nodeData.setFullText(fullText);
         }
 
@@ -160,7 +156,6 @@ public class AlfrescoWebscriptClient {
         ReadersACL readers = client.target(url)
                 .request(MediaType.APPLICATION_JSON)
                 .post(Entity.json(param)).readEntity(ReadersACL.class);
-
         return readers;
     }
 

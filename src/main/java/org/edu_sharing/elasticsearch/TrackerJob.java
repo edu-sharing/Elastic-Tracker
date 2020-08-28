@@ -17,7 +17,10 @@ public class TrackerJob {
 
     @Scheduled(cron = "*/5 * * * * *")
     public void track(){
-        aclTracker.track();
-        transactionTracker.track();
+        boolean aclChanges=aclTracker.track();
+        boolean transactionChanges=transactionTracker.track();
+        if(aclChanges || transactionChanges){
+            track();
+        }
     }
 }

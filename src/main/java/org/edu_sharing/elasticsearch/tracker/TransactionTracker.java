@@ -61,7 +61,7 @@ public class TransactionTracker {
     }
 
 
-    public void track(){
+    public boolean track(){
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
         eduSharingClient.refreshValuespaceCache();
@@ -89,10 +89,10 @@ public class TransactionTracker {
             lastTransactionId = newLastTransactionId;
             if(transactions.getMaxTxnId() <= lastTransactionId){
                 logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
-                return;
+                return true;
             }else{
                 logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
-                return;
+                return true;
             }
         }
 
@@ -103,11 +103,11 @@ public class TransactionTracker {
             //long lastProcessedTxId = transactions.getTransactions().get(size -1).getId();
             if(txn != null && (txn.getTxnId() == transactions.getMaxTxnId())){
                 logger.info("nothing to do.");
-                return;
+                return false;
             }
         } catch (IOException e) {
             logger.error(e.getMessage(),e);
-            return;
+            return false;
         }
 
 
@@ -140,7 +140,7 @@ public class TransactionTracker {
 
         if(nodes.size() == 0){
             lastTransactionId = newLastTransactionId;
-            return;
+            return true;
         }
 
         /**
@@ -159,44 +159,53 @@ public class TransactionTracker {
                 .filter(n -> !n.getStatus().equals("d"))
                 .collect(Collectors.toList());
 
-        /**
-         * get node metadata
-         *
-         * use every single node to get metadata instead of bulk to prevent damaged nodes break other nodes
-         */
-        List<NodeData> nodeData = new ArrayList<NodeData>();
-        for(Node node : nodes){
-            try {
-                List<NodeData> nodeDataTmp = client.getNodeData(Arrays.asList(new Node[] {node}));
-                nodeData.addAll(nodeDataTmp);
-            }catch(javax.ws.rs.ProcessingException e){
-                logger.error("error unmarshalling NodeMetadata for node " + node,e);
+        List<NodeMetadata> nodeData = new ArrayList<>();
+        try {
+            nodeData.addAll(client.getNodeMetadata(nodes));
+        } catch(Throwable t) {
+            /**
+             * get node metadata
+             *
+             * use every single node to get metadata instead of bulk to prevent damaged nodes break other nodes
+             */
+            for (Node node : nodes) {
+                try {
+                    List<NodeMetadata> nodeDataTmp = client.getNodeMetadata(Arrays.asList(new Node[]{node}));
+                    nodeData.addAll(nodeDataTmp);
+                } catch (javax.ws.rs.ProcessingException e) {
+                    logger.error("error unmarshalling NodeMetadata for node " + node, e);
+                }
             }
         }
+        logger.info("getNodeData done " +nodeData.size());
         try{
 
-            List<NodeData> toIndexUsages = nodeData
+            List<NodeMetadata> toIndexUsagesMd = nodeData
                     .stream()
-                    .filter(n -> "ccm:usage".equals(n.getNodeMetadata().getType()))
+                    .filter(n -> "ccm:usage".equals(n.getType()))
                     .collect(Collectors.toList());
 
-            List<NodeData> toIndex = new ArrayList<NodeData>();
-            for(NodeData data : nodeData){
+            List<NodeMetadata> toIndexMd = new ArrayList<>();
+            for(NodeMetadata data : nodeData){
 
                 if(allowedTypes != null && !allowedTypes.trim().equals("")){
                     String[] allowedTypesArray = allowedTypes.split(",");
-                    String type = data.getNodeMetadata().getType();
+                    String type = data.getType();
 
                     if(!Arrays.asList(allowedTypesArray).contains(type)){
                         logger.debug("ignoring type:" + type);
                         continue;
                     }
                 }
-
-                eduSharingClient.translateValuespaceProps(data);
-                toIndex.add(data);
-
+                toIndexMd.add(data);
             }
+            List<NodeData> toIndex = client.getNodeData(toIndexMd);
+            for(NodeData data: toIndex) {
+                eduSharingClient.translateValuespaceProps(data);
+            }
+
+            logger.info("final usable: " + toIndexUsagesMd.size() + " " + toIndex.size());
+
             elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
@@ -204,7 +213,7 @@ public class TransactionTracker {
              * refresh index so that collections will be found by cacheCollections process
              */
             elasticClient.refresh(ElasticsearchClient.INDEX_WORKSPACE);
-            for(NodeData usage : toIndexUsages) elasticClient.indexCollections(usage.getNodeMetadata());
+            for(NodeMetadata usage : toIndexUsagesMd) elasticClient.indexCollections(usage);
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
@@ -223,5 +232,6 @@ public class TransactionTracker {
         logger.info("finished lastTransactionId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
+        return true;
     }
 }
