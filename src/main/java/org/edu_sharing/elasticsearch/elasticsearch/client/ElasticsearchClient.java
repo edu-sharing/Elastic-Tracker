@@ -385,7 +385,8 @@ public class ElasticsearchClient {
             Map<Long,NodeData> collectionNodes = new HashMap<>();
             for(NodeData nodeData: nodes) {
                 NodeMetadata node = nodeData.getNodeMetadata();
-                if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
+                if((node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection"))
+                        || (node.getType().equals("ccm:io") && !node.getAspects().contains("ccm:collection_io_reference"))){
                     collectionNodes.put(node.getId(),nodeData);
                 }
             }
@@ -410,9 +411,9 @@ public class ElasticsearchClient {
                         continue;
                     }
                     Long dbId = Long.parseLong(item.getResponse().getId());
-                    NodeData collectionData = collectionNodes.get(dbId);
-                    if (collectionData != null) {
-                        onUpdateRefreshCollectionReplicas(collectionData.getNodeMetadata());
+                    NodeData nodeData = collectionNodes.get(dbId);
+                    if (nodeData != null) {
+                        onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
                     }
                 }
                 logger.info("finished RefreshCollectionReplicas");
@@ -662,10 +663,22 @@ public class ElasticsearchClient {
         this.updateBulk(updateRequests);
     }
 
-    private void onUpdateRefreshCollectionReplicas(NodeMetadata nodeCollection) throws IOException {
+    private void onUpdateRefreshCollectionReplicas(NodeMetadata node) throws IOException {
+
+        String query = null;
+        if("ccm:map".equals(node.getType())){
+            query = "properties.ccm:usagecourseid.keyword";
+        }else if("ccm:io".equals(node.getType())){
+            query = "properties.ccm:usageparentnodeid.keyword";
+        }else{
+            logger.info("can not handle collections for type:" + node.getType());
+            return;
+        }
+
+        logger.info("updateing collections for " + node.getType() +" " +node.getId());
 
        //find usages for collection
-        QueryBuilder queryUsages = QueryBuilders.termQuery("properties.ccm:usagecourseid.keyword", Tools.getUUID(nodeCollection.getNodeRef()));
+        QueryBuilder queryUsages = QueryBuilders.termQuery(query, Tools.getUUID(node.getNodeRef()));
         new SearchHitsRunner(this){
 
             @Override
