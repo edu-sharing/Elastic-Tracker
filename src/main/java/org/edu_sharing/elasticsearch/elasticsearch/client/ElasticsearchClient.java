@@ -90,6 +90,8 @@ public class ElasticsearchClient {
 
     String homeRepoId;
 
+    RestHighLevelClient client = null;
+
     @Autowired
     private EduSharingClient eduSharingClient;
     private int nodeCounter;
@@ -108,7 +110,6 @@ public class ElasticsearchClient {
         DeleteIndexRequest request = new DeleteIndexRequest(index);
         RestHighLevelClient client = getClient();
         client.indices().delete(request, RequestOptions.DEFAULT);
-        client.close();
     }
     private void createIndexIfNotExists(String index) throws IOException{
         GetIndexRequest request = new GetIndexRequest(index);
@@ -117,7 +118,6 @@ public class ElasticsearchClient {
             CreateIndexRequest createIndexRequest = new CreateIndexRequest(index);
             client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
         }
-        client.close();
     }
 
     public void updatePermissions(long dbid, Map<String,List<String>> permissions) throws IOException {
@@ -153,7 +153,6 @@ public class ElasticsearchClient {
         } else if (updateResponse.getResult() == DocWriteResponse.Result.NOOP) {
 
         }
-        client.close();
     }
 
     public void updateBulk(List<UpdateRequest> updateRequests) throws IOException{
@@ -170,7 +169,6 @@ public class ElasticsearchClient {
                 }
             }
         }
-        client.close();
     }
 
     public void index(List<NodeData> nodes) throws IOException{
@@ -423,7 +421,6 @@ public class ElasticsearchClient {
             }
 
         }
-        client.close();
         logger.info("returning");
     }
 
@@ -431,11 +428,9 @@ public class ElasticsearchClient {
         logger.debug("starting");
         RefreshRequest request = new RefreshRequest(index);
         RestHighLevelClient client = getClient();
-        try {
-            client.indices().refresh(request, RequestOptions.DEFAULT);
-        }finally{
-            client.close();
-        }
+
+        client.indices().refresh(request, RequestOptions.DEFAULT);
+
         logger.debug("returning");
     }
 
@@ -520,7 +515,7 @@ public class ElasticsearchClient {
      * @throws IOException
      */
     public void beforeDeleteCleanupCollectionReplicas(List<Node> nodes) throws IOException{
-        logger.info("starting");
+        logger.info("starting: " + nodes.size());
 
         if(nodes.size() == 0){
             logger.info("returning 0");
@@ -761,14 +756,12 @@ public class ElasticsearchClient {
                 logger.error(failure.nodeId() +" reason:"+reason);
             }
         }
-        client.close();
     }
 
     private GetResponse get(String index, String id) throws IOException {
         RestHighLevelClient client = getClient();
         GetRequest getRequest = new GetRequest(index,id);
         GetResponse resp = client.get(getRequest,RequestOptions.DEFAULT);
-        client.close();
         return resp;
     }
 
@@ -834,8 +827,6 @@ public class ElasticsearchClient {
                 }
             }
         }
-
-        client.close();
         logger.info("returning");
     }
 
@@ -917,8 +908,6 @@ public class ElasticsearchClient {
         }catch(Exception e) {
             logger.error(e.getMessage(),e);
             throw e;
-        }finally {
-            client.close();
         }
     }
 
@@ -949,13 +938,12 @@ public class ElasticsearchClient {
         searchSourceBuilder.size(size);
         searchRequest.source(searchSourceBuilder);
         SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
-        client.close();
         return searchResponse.getHits();
     }
 
-    RestHighLevelClient getClient(){
-
-        RestHighLevelClient client = new RestHighLevelClient(
+    RestHighLevelClient getClient() throws IOException{
+        if(client == null || !client.ping(RequestOptions.DEFAULT)){
+            client = new RestHighLevelClient(
                 RestClient.builder(
                         new HttpHost(elasticHost, elasticPort, elasticProtocol)
                         //,new HttpHost("localhost", 9201, "http")
@@ -985,6 +973,8 @@ public class ElasticsearchClient {
 
                                     }
                                 }));
+
+        }
 
         return client;
     };
