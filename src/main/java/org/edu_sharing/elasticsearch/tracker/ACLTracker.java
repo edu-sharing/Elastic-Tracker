@@ -123,7 +123,7 @@ public class ACLTracker {
             List<SearchHit> searchHits = elasticClient.searchForAclIds(acls.getAcls().stream().map(Acl::getId).collect(Collectors.toList()));
             for (Acl acl : acls.getAcls()) {
                 List<SearchHit> hits = searchHits.stream().filter((h) ->
-                        h.getSourceAsMap().get("aclId").equals(acl.getId())
+                        Long.valueOf(((Number)h.getSourceAsMap().get("aclId")).longValue()).equals(acl.getId())
                 ).collect(Collectors.toList());
                 if(hits.size() == 0){
                     logger.info("no nodes found in index for aclid:" +acl.getId());
