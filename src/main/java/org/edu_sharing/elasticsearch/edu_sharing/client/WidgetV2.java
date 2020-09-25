@@ -57,7 +57,6 @@ public class WidgetV2 {
 		private Integer defaultMax;
 		private Integer step;
 		private boolean isExtended;
-		private boolean isRequired;
 		private boolean allowempty;
 		private String defaultvalue;
 		private boolean isSearchable;
@@ -154,13 +153,6 @@ public class WidgetV2 {
 		}
 		public void setAllowempty(boolean allowempty) {
 			this.allowempty = allowempty;
-		}
-		@JsonProperty("isRequired")
-		public boolean isRequired() {
-			return isRequired;
-		}
-		public void setRequired(boolean isRequired) {
-			this.isRequired = isRequired;
 		}
 		public List<ValueV2> getValues() {
 			return values;
