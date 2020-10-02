@@ -166,7 +166,9 @@ public class ACLTracker {
                         Collections.sort(authorities);
                         permissionsAlf.put(ace.getPermission(), authorities);
                     }
-                    permissionsAlf.put("read",alfReader);
+                    if(alfReader != null && alfReader.size() > 0) {
+                        permissionsAlf.put("read", alfReader);
+                    }
                     //sort alf map keys:
                     permissionsAlf = new TreeMap<>(permissionsAlf);
 

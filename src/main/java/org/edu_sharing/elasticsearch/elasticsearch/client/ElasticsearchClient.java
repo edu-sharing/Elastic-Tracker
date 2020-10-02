@@ -40,6 +40,7 @@ import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.script.Script;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -131,14 +132,26 @@ public class ElasticsearchClient {
             builder.endObject();
         }
         builder.endObject();
+        //remove and add permissions cause its a object that would be merged
+        //this.update(dbid,new Script("ctx._source.remove('permissions')"));
+        this.update(dbid,new Script("ctx._source.permissions=null"));
         this.update(dbid,builder);
     }
 
     public void update(long dbId, XContentBuilder builder) throws IOException{
-        RestHighLevelClient client = getClient();
         UpdateRequest request = new UpdateRequest(
                 INDEX_WORKSPACE,
                 Long.toString(dbId)).doc(builder);
+        this.update(request);
+    }
+    public void update(long dbId, Script script) throws IOException{
+        UpdateRequest request = new UpdateRequest(
+                INDEX_WORKSPACE,
+                Long.toString(dbId)).script(script);
+        this.update(request);
+    }
+    private void update(UpdateRequest request) throws IOException{
+        RestHighLevelClient client = getClient();
         UpdateResponse updateResponse = client.update(
                 request, RequestOptions.DEFAULT);
         String index = updateResponse.getIndex();
