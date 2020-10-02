@@ -15,9 +15,11 @@ public abstract class SearchHitsRunner {
     }
 
     public void run(QueryBuilder queryBuilder)throws IOException {
+        this.run(queryBuilder,5);
+    }
+    public void run(QueryBuilder queryBuilder, int pageSize)throws IOException {
 
         int page = 0;
-        int pageSize = 5;
         SearchHits searchHits = null;
         do{
             if(searchHits != null){
@@ -29,8 +31,6 @@ public abstract class SearchHitsRunner {
             }
 
         }while(searchHits.getTotalHits().value > page);
-
-
     }
 
     public abstract void execute(SearchHit hit) throws IOException;

@@ -923,8 +923,14 @@ public class ElasticsearchClient {
             for(Long aclId: aclIds.subList(i, Math.min(aclIds.size(), i + 500))) {
                 query.should(QueryBuilders.termQuery("aclId", aclId));
             }
-            SearchHits hits = this.search(INDEX_WORKSPACE, query, 0, aclIds.size());
-            result.addAll(Arrays.asList(hits.getHits()));
+
+            SearchHitsRunner shr = new SearchHitsRunner(this){
+                @Override
+                public void execute(SearchHit hit) throws IOException {
+                    result.add(hit);
+                }
+            };
+            shr.run(query,200);
         }
         return result;
     }
