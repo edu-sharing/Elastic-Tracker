@@ -40,7 +40,10 @@ import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.reindex.BulkByScrollResponse;
+import org.elasticsearch.index.reindex.UpdateByQueryRequest;
 import org.elasticsearch.script.Script;
+import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -53,6 +56,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
@@ -136,6 +140,27 @@ public class ElasticsearchClient {
         //this.update(dbid,new Script("ctx._source.remove('permissions')"));
         this.update(dbid,new Script("ctx._source.permissions=null"));
         this.update(dbid,builder);
+    }
+
+    public void updateNodesWithAcl(long aclId, Map<String,List<String>> permissions) throws IOException {
+        logger.info("starting: "+ aclId);
+        UpdateByQueryRequest request = new UpdateByQueryRequest(INDEX_WORKSPACE);
+        request.setQuery(QueryBuilders.termQuery("aclId", aclId));
+        request.setConflicts("proceed");
+        request.setRefresh(true);
+       // Script script = new Script("ctx._source.permissions=null");
+
+        HashMap<String,Object> param = new HashMap<>(permissions);
+        Script script =  new Script(ScriptType.INLINE,Script.DEFAULT_SCRIPT_LANG,"ctx._source.permissions=params",param);
+
+        request.setScript(script);
+        RestHighLevelClient client = getClient();
+        BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
+        logger.info("updated: " + bulkByScrollResponse.getUpdated());
+        List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
+        for(BulkItemResponse.Failure failure : bulkFailures){
+            logger.error(failure.getMessage(),failure.getCause());
+        }
     }
 
     public void update(long dbId, XContentBuilder builder) throws IOException{
@@ -922,30 +947,6 @@ public class ElasticsearchClient {
             logger.error(e.getMessage(),e);
             throw e;
         }
-    }
-
-    public SearchHits searchForAclId(long acl) throws IOException {
-        return this.search(INDEX_WORKSPACE, QueryBuilders.termQuery("aclId", acl), 0, 10000);
-    }
-
-    public List<SearchHit> searchForAclIds(List<Long> aclIds) throws IOException {
-        List<SearchHit> result = new ArrayList<>();
-        // paritionate to prevent maxClauseCount errors in elastic
-        for(int i=0;i<aclIds.size();i+=500){
-            BoolQueryBuilder query = QueryBuilders.boolQuery().minimumShouldMatch(1);
-            for(Long aclId: aclIds.subList(i, Math.min(aclIds.size(), i + 500))) {
-                query.should(QueryBuilders.termQuery("aclId", aclId));
-            }
-
-            SearchHitsRunner shr = new SearchHitsRunner(this){
-                @Override
-                public void execute(SearchHit hit) throws IOException {
-                    result.add(hit);
-                }
-            };
-            shr.run(query,200);
-        }
-        return result;
     }
 
     public SearchHits search(String index, QueryBuilder queryBuilder, int from, int size) throws IOException {
