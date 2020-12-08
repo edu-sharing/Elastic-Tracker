@@ -87,6 +87,13 @@
 			</exclusions>
 		</dependency>
 
+		<!-- https://mvnrepository.com/artifact/net.sourceforge.cardme/cardme -->
+		<dependency>
+			<groupId>net.sourceforge.cardme</groupId>
+			<artifactId>cardme</artifactId>
+			<version>0.4.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

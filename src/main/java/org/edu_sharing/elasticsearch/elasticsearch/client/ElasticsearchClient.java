@@ -1,6 +1,9 @@
 package org.edu_sharing.elasticsearch.elasticsearch.client;
 
 
+import net.sourceforge.cardme.engine.VCardEngine;
+import net.sourceforge.cardme.vcard.VCard;
+import net.sourceforge.cardme.vcard.exceptions.VCardParseException;
 import org.apache.http.HttpHost;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
@@ -298,7 +301,7 @@ public class ElasticsearchClient {
                     }
 
 
-
+                    HashMap<String,Serializable> contributerProperties = new HashMap<>();
                     builder.startObject("properties");
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
 
@@ -309,6 +312,12 @@ public class ElasticsearchClient {
                         }
 
                         Serializable value = prop.getValue();
+
+                        if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z]*")){
+                            if(value != null){
+                                contributerProperties.put(key,value);
+                            }
+                        }
 
                         if(prop.getValue() instanceof List){
                             List listvalue = (List)prop.getValue();
@@ -369,6 +378,44 @@ public class ElasticsearchClient {
                     builder.endObject();
 
                     builder.field("aspects", node.getAspects());
+
+                    if(contributerProperties.size() > 0){
+                        VCardEngine vcardEngine = new VCardEngine();
+                        builder.startObject("contributer");
+                        for(Map.Entry<String,Serializable> entry : contributerProperties.entrySet()){
+                            if(entry.getValue() instanceof List){
+                                builder.startArray(entry.getKey());
+                                List<String> val = (List<String>)entry.getValue();
+                                for(String v : val){
+                                    try {
+                                        VCard vcard = vcardEngine.parse(v);
+                                        if(vcard != null){
+
+                                            builder.startObject();
+                                            if(vcard.getN() != null){
+                                                builder.field("firstname",vcard.getN().getGivenName());
+                                                builder.field("lastname",vcard.getN().getFamilyName());
+                                            }
+                                            if(vcard.getEmails() != null && vcard.getEmails().size() > 0){
+                                                builder.field("email",vcard.getEmails().get(0).getEmail());
+                                            }
+                                            if(vcard.getUid() != null){
+                                                builder.field("uuid",vcard.getUid().getUid());
+                                            }
+                                            if(vcard.getUrls() != null && vcard.getUrls().size() > 0){
+                                                builder.field("url",vcard.getUrls().get(0).getRawUrl());
+                                            }
+                                            builder.endObject();
+                                        }
+                                    } catch (VCardParseException e) {
+                                        logger.error(e.getMessage(),e);
+                                    }
+                                }
+                                builder.endArray();
+                            }
+                        }
+                        builder.endObject();
+                    }
 
                 }
                 builder.endObject();
