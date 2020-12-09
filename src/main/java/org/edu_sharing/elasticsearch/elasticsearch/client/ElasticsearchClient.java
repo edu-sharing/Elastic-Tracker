@@ -381,10 +381,10 @@ public class ElasticsearchClient {
 
                     if(contributerProperties.size() > 0){
                         VCardEngine vcardEngine = new VCardEngine();
-                        builder.startObject("contributer");
+                        builder.startArray("contributer");
                         for(Map.Entry<String,Serializable> entry : contributerProperties.entrySet()){
                             if(entry.getValue() instanceof List){
-                                builder.startArray(entry.getKey());
+
                                 List<String> val = (List<String>)entry.getValue();
                                 for(String v : val){
                                     try {
@@ -392,6 +392,7 @@ public class ElasticsearchClient {
                                         if(vcard != null){
 
                                             builder.startObject();
+                                            builder.field("property",entry.getKey());
                                             if(vcard.getN() != null){
                                                 builder.field("firstname",vcard.getN().getGivenName());
                                                 builder.field("lastname",vcard.getN().getFamilyName());
@@ -411,10 +412,10 @@ public class ElasticsearchClient {
                                         logger.error(e.getMessage(),e);
                                     }
                                 }
-                                builder.endArray();
+
                             }
                         }
-                        builder.endObject();
+                        builder.endArray();
                     }
 
                 }
