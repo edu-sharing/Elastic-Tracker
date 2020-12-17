@@ -301,7 +301,7 @@ public class ElasticsearchClient {
                     }
 
 
-                    HashMap<String,Serializable> contributerProperties = new HashMap<>();
+                    HashMap<String,Serializable> contributorProperties = new HashMap<>();
                     builder.startObject("properties");
                     for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
 
@@ -315,7 +315,7 @@ public class ElasticsearchClient {
 
                         if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z]*")){
                             if(value != null){
-                                contributerProperties.put(key,value);
+                                contributorProperties.put(key,value);
                             }
                         }
 
@@ -379,10 +379,10 @@ public class ElasticsearchClient {
 
                     builder.field("aspects", node.getAspects());
 
-                    if(contributerProperties.size() > 0){
+                    if(contributorProperties.size() > 0){
                         VCardEngine vcardEngine = new VCardEngine();
-                        builder.startArray("contributer");
-                        for(Map.Entry<String,Serializable> entry : contributerProperties.entrySet()){
+                        builder.startArray("contributor");
+                        for(Map.Entry<String,Serializable> entry : contributorProperties.entrySet()){
                             if(entry.getValue() instanceof List){
 
                                 List<String> val = (List<String>)entry.getValue();
