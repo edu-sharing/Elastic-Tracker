@@ -406,6 +406,7 @@ public class ElasticsearchClient {
                                             if(vcard.getUrls() != null && vcard.getUrls().size() > 0){
                                                 builder.field("url",vcard.getUrls().get(0).getRawUrl());
                                             }
+                                            builder.field("vcard",v);
                                             builder.endObject();
                                         }
                                     } catch (VCardParseException e) {
