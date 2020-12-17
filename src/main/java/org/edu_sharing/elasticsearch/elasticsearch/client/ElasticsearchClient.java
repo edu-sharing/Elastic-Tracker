@@ -4,6 +4,7 @@ package org.edu_sharing.elasticsearch.elasticsearch.client;
 import net.sourceforge.cardme.engine.VCardEngine;
 import net.sourceforge.cardme.vcard.VCard;
 import net.sourceforge.cardme.vcard.exceptions.VCardParseException;
+import net.sourceforge.cardme.vcard.types.ExtendedType;
 import org.apache.http.HttpHost;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
@@ -406,6 +407,17 @@ public class ElasticsearchClient {
                                             if(vcard.getUrls() != null && vcard.getUrls().size() > 0){
                                                 builder.field("url",vcard.getUrls().get(0).getRawUrl());
                                             }
+
+                                            List<ExtendedType> extendedTypes = vcard.getExtendedTypes();
+                                            if(extendedTypes != null){
+                                                for(ExtendedType et : extendedTypes){
+                                                    if(et.getExtendedValue() != null && !et.getExtendedValue().trim().equals("")){
+                                                        builder.field(et.getExtendedName(), et.getExtendedValue());
+                                                    }
+                                                }
+                                            }
+
+
                                             builder.field("vcard",v);
                                             builder.endObject();
                                         }
