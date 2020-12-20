@@ -985,6 +985,7 @@ public class ElasticsearchClient {
                                     .field("path_match","properties_aggregated.*")
                                     .startObject("mapping")
                                         .field("type", "keyword")
+                                        .field("store", true)
                                     .endObject()
                                 .endObject()
                             .endObject()
