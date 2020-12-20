@@ -947,9 +947,67 @@ public class ElasticsearchClient {
             XContentBuilder builder = XContentFactory.jsonBuilder();
             builder.startObject();
             {
+                /*
 
+                "mappings": {
+                "dynamic": "true",
+                        "dynamic_templates": [
+                {
+                    "aggregated_type": {
+                    "path_match":   "*properties_aggregated.*",
+                            "mapping": {
+                        "type":"keyword"
+                    }
+                }
+                },{
+                    "copy_facettes": {
+                        "path_match":   "*properties.*",
+                                "mapping": {
+                            "type":"text",
+                                    "copy_to":"properties_aggregated.{name}",
+                                    "fields": {
+                                "keyword": {
+                                    "type":  "keyword",
+                                            "ignore_above": 256
+                                }
+                            }
+                        }
+                    }
+                }
+    ],*/
+                // dynamic copy to fields for facettes across collection refs
+                builder
+                        .field("dynamic", true)
+                        .startArray("dynamic_templates")
+                            .startObject()
+                                .startObject("aggregated_type")
+                                    .field("match_mapping_type","string")
+                                    .field("path_match","properties_aggregated.*")
+                                    .startObject("mapping")
+                                        .field("type", "keyword")
+                                    .endObject()
+                                .endObject()
+                            .endObject()
+                            .startObject()
+                                .startObject("copy_facettes")
+                                    .field("path_match", "*properties.*")
+                                    .field("match_mapping_type","string")
+                                    .startObject("mapping")
+                                        .field("type", "text")
+                                        .field("copy_to", "properties_aggregated.{name}")
+                                        .startObject("fields")
+                                            .startObject("keyword")
+                                                .field("type", "keyword")
+                                                .field("ignore_above",  256)
+                                            .endObject()
+                                        .endObject()
+                                    .endObject()
+                                .endObject()
+                            .endObject()
+                        .endArray();
                 builder.startObject("properties");
                 {
+
                     builder.startObject("aclId").field("type", "long").endObject();
                     builder.startObject("txnId").field("type", "long").endObject();
                     builder.startObject("dbid").field("type", "long").endObject();
