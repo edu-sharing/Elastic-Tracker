@@ -1,13 +1,21 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicHeader;
 import org.apache.logging.log4j.LogManager;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
+import org.edu_sharing.elasticsearch.alfresco.client.NodePreview;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 
 import javax.annotation.PostConstruct;
 import javax.ws.rs.ProcessingException;
@@ -18,7 +26,9 @@ import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -58,6 +68,8 @@ public class EduSharingClient {
     private Client client;
 
     String URL_MDS_VALUES = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}/values";
+
+    String URL_PREVIEW = "/edu-sharing/preview?nodeId=${nodeId}&storeProtocol=${storeProtocol}&storeId=${storeId}&crop=true&maxWidth=${width}&maxHeight=${height}&quality=${quality}";
 
     String URL_MDS = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}";
 
@@ -227,6 +239,58 @@ public class EduSharingClient {
             }
         }
         return result;
+    }
+
+    public void addPreview(NodeData node){
+        String url = getUrl(URL_PREVIEW).
+                replace("${nodeId}", Tools.getUUID(node.getNodeMetadata().getNodeRef())).
+                replace("${storeProtocol}", Tools.getProtocol(node.getNodeMetadata().getNodeRef())).
+                replace("${storeId}", Tools.getIdentifier(node.getNodeMetadata().getNodeRef()));
+
+        String urlSmall = url.replace("${width}", "400").
+                replace("${height}", "400").
+                replace("${quality}", "60");
+        String urlLarge = url.replace("${width}", "800").
+                replace("${height}", "800").
+                replace("${quality}", "70");
+
+        PreviewData previewSmall=getPreviewData(urlSmall);
+        //byte[] previewLarge=getPreviewData(urlSmall);
+
+        NodePreview preview = new NodePreview();
+        preview.setMimetype(previewSmall.getMimetype());
+        preview.setSmall(previewSmall.getData());
+
+        // both are individual, so also save the small one
+        /*
+        if(!Arrays.equals(previewSmall, previewLarge)){
+            preview.setLarge(preview);
+        }
+
+         */
+        node.setNodePreview(preview);
+    }
+
+    private PreviewData getPreviewData(String url) {
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpGet request = new HttpGet(url);
+        request.setHeader(new BasicHeader(
+                "Authorization",
+                "Basic " + Base64.getEncoder().encodeToString((alfrescoUsername + ":" + alfrescoPassword).getBytes())
+        ));
+        try {
+            PreviewData previewData = new PreviewData();
+            CloseableHttpResponse result = httpClient.execute(request);
+            previewData.setMimetype(result.getEntity().getContentType().getValue());
+            previewData.setData(StreamUtils.copyToByteArray(result.getEntity().getContent()));
+            logger.info("type: " + previewData.getMimetype() + ", size: " + previewData.getData().length);
+            result.close();
+            return previewData;
+        } catch(IOException e){
+            logger.warn("Could not fetch preview url "+url+": " + e.toString());
+            return null;
+        }
+
     }
 
     public About getAbout(){

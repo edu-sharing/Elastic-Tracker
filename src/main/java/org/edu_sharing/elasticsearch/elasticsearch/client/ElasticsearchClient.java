@@ -430,8 +430,15 @@ public class ElasticsearchClient {
                         }
                         builder.endArray();
                     }
-
+                    if(nodeData.getNodePreview() != null) {
+                        builder.startObject("preview").
+                                field("mimetype", nodeData.getNodePreview().getMimetype()).
+                                field("small", nodeData.getNodePreview().getSmall()).
+                                //field("large", nodeData.getNodePreview().getLarge()).
+                        endObject();
+                    }
                 }
+
                 builder.endObject();
 
 
@@ -1054,8 +1061,19 @@ public class ElasticsearchClient {
 
                     .endObject();
 
+                    builder.startObject("preview")
+                            .startObject("properties");
+                    {
+                        builder.startObject("mimetype").field("type", "keyword").endObject();
+                        builder.startObject("small").field("type", "binary").endObject();
+                        //builder.startObject("large").field("type", "binary").endObject();
+                    }
+                    builder.endObject()
+                            .endObject();
+
                 }
                 builder.endObject();
+
             }
             builder.endObject();
 

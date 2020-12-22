@@ -200,6 +200,7 @@ public class TransactionTracker {
             }
             List<NodeData> toIndex = client.getNodeData(toIndexMd);
             for(NodeData data: toIndex) {
+                eduSharingClient.addPreview(data);
                 eduSharingClient.translateValuespaceProps(data);
             }
 

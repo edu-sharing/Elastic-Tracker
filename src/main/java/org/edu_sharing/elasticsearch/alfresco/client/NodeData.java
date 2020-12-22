@@ -7,6 +7,7 @@ import java.util.Map;
 
 public class NodeData {
     NodeMetadata nodeMetadata;
+    NodePreview nodePreview;
     Reader reader;
     String fullText;
 
@@ -21,6 +22,14 @@ public class NodeData {
 
     public void setNodeMetadata(NodeMetadata nodeMetadata) {
         this.nodeMetadata = nodeMetadata;
+    }
+
+    public NodePreview getNodePreview() {
+        return nodePreview;
+    }
+
+    public void setNodePreview(NodePreview nodePreview) {
+        this.nodePreview = nodePreview;
     }
 
     public Reader getReader() {
