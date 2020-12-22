@@ -258,8 +258,10 @@ public class EduSharingClient {
         //byte[] previewLarge=getPreviewData(urlSmall);
 
         NodePreview preview = new NodePreview();
-        preview.setMimetype(previewSmall.getMimetype());
-        preview.setSmall(previewSmall.getData());
+        if(previewSmall!=null) {
+            preview.setMimetype(previewSmall.getMimetype());
+            preview.setSmall(previewSmall.getData());
+        }
 
         // both are individual, so also save the small one
         /*
