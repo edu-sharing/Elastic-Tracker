@@ -17,6 +17,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Component
@@ -37,12 +41,16 @@ public class TransactionTracker {
     @Value("${index.storerefs}")
     List<String> indexStoreRefs;
 
+    @Value("${threading.threadCount}")
+    Integer threadCount;
+
     long lastFromCommitTime = -1;
     long lastTransactionId = -1;
 
     final static int maxResults = 500;
 
     Logger logger = LogManager.getLogger(TransactionTracker.class);
+    private ForkJoinPool threadPool;
 
     @PostConstruct
     public void init()  throws IOException{
@@ -58,6 +66,8 @@ public class TransactionTracker {
             logger.error("problems reaching elastic search server");
             throw e;
         }
+        threadPool = new ForkJoinPool(threadCount);
+
     }
 
 
@@ -200,8 +210,14 @@ public class TransactionTracker {
             }
             List<NodeData> toIndex = client.getNodeData(toIndexMd);
             for(NodeData data: toIndex) {
-                eduSharingClient.addPreview(data);
-                eduSharingClient.translateValuespaceProps(data);
+                threadPool.execute(() -> {
+                    eduSharingClient.addPreview(data);
+                    eduSharingClient.translateValuespaceProps(data);
+                });
+            }
+            if(!threadPool.awaitQuiescence(10, TimeUnit.MINUTES)){
+                logger.error("Fatal error while processing nodes: timeout of preview and transform processing");
+                logger.error(nodeData.stream().map(NodeMetadata::getNodeRef).collect(Collectors.joining(", ")));
             }
 
             logger.info("final usable: " + toIndexUsagesMd.size() + " " + toIndex.size());
