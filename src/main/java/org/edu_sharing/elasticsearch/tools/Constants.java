@@ -2,6 +2,7 @@ package org.edu_sharing.elasticsearch.tools;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Constants {
 
@@ -32,13 +33,13 @@ public class Constants {
 
     public final static String CM_PROP_EDUMETADATASET = "{" + NAMESPACE_CM + "}edu_metadataset";
 
-    private static HashMap<String, String> nameSpaceMap = null;
+    private static Map<String, String> nameSpaceMap = null;
     /**
      * @return <namespace,localnamespace>
      */
-    public static HashMap<String, String> getNameSpaceMap() {
+    public static Map<String, String> getNameSpaceMap() {
         if(nameSpaceMap == null){
-            nameSpaceMap = new HashMap<String, String>();
+            nameSpaceMap = new ConcurrentHashMap<>();
             nameSpaceMap.put(NAMESPACE_CCM, NAMESPACE_SHORT_CCM);
             nameSpaceMap.put(NAMESPACE_CM, NAMESPACE_SHORT_CM);
             nameSpaceMap.put(NAMESPACE_LOM, NAMESPACE_SHORT_LOM);

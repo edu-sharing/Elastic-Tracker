@@ -60,6 +60,9 @@ public class EduSharingClient {
     @Value("${valuespace.cache.check.after.ms : 120000}")
     long valuespaceCacheCheckAfterMs = 120000;
 
+    @Value("${tracker.fetchThumbnails}")
+    boolean fetchThumbnails;
+
     long valuespaceCacheLastChecked = -1;
 
     long valuespaceCacheLastModified = -1;
@@ -242,6 +245,9 @@ public class EduSharingClient {
     }
 
     public void addPreview(NodeData node){
+        if(!fetchThumbnails){
+            return;
+        }
         String url = getUrl(URL_PREVIEW).
                 replace("${nodeId}", Tools.getUUID(node.getNodeMetadata().getNodeRef())).
                 replace("${storeProtocol}", Tools.getProtocol(node.getNodeMetadata().getNodeRef())).
