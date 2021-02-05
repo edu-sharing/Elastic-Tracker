@@ -67,24 +67,6 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 @Component
 public class ElasticsearchClient {
 
-    @Value("${elastic.host}")
-    String elasticHost;
-
-    @Value("${elastic.port}")
-    int elasticPort;
-
-    @Value("${elastic.protocol}")
-    String elasticProtocol;
-
-    @Value("${elastic.socketTimeout}")
-    int elasticSocketTimeout;
-
-    @Value("${elastic.connectTimeout}")
-    int elasticConnectTimeout;
-
-    @Value("${elastic.connectionRequestTimeout}")
-    int elasticConnectionRequestTimeout;
-
     Logger logger = LogManager.getLogger(ElasticsearchClient.class);
 
     public static String INDEX_WORKSPACE = "workspace";
@@ -99,6 +81,7 @@ public class ElasticsearchClient {
 
     String homeRepoId;
 
+    @Autowired
     RestHighLevelClient client = null;
 
     @Autowired
@@ -117,12 +100,10 @@ public class ElasticsearchClient {
     }
     private void deleteIndex(String index) throws IOException{
         DeleteIndexRequest request = new DeleteIndexRequest(index);
-        RestHighLevelClient client = getClient();
         client.indices().delete(request, RequestOptions.DEFAULT);
     }
     private void createIndexIfNotExists(String index) throws IOException{
         GetIndexRequest request = new GetIndexRequest(index);
-        RestHighLevelClient client = getClient();
         if(!client.indices().exists(request,RequestOptions.DEFAULT)){
             CreateIndexRequest createIndexRequest = new CreateIndexRequest(index);
             client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
@@ -158,7 +139,6 @@ public class ElasticsearchClient {
         Script script =  new Script(ScriptType.INLINE,Script.DEFAULT_SCRIPT_LANG,"ctx._source.permissions=params",param);
 
         request.setScript(script);
-        RestHighLevelClient client = getClient();
         BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
         logger.info("updated: " + bulkByScrollResponse.getUpdated());
         List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
@@ -180,7 +160,6 @@ public class ElasticsearchClient {
         this.update(request);
     }
     private void update(UpdateRequest request) throws IOException{
-        RestHighLevelClient client = getClient();
         UpdateResponse updateResponse = client.update(
                 request, RequestOptions.DEFAULT);
         String index = updateResponse.getIndex();
@@ -198,7 +177,6 @@ public class ElasticsearchClient {
     }
 
     public void updateBulk(List<UpdateRequest> updateRequests) throws IOException{
-        RestHighLevelClient client = getClient();
         BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
         for(UpdateRequest updateRequest : updateRequests){
             bulkRequest.add(updateRequest);
@@ -215,7 +193,6 @@ public class ElasticsearchClient {
 
     public void index(List<NodeData> nodes) throws IOException{
         logger.info("starting");
-        RestHighLevelClient client = getClient();
 
         BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
         boolean useBulkUpdate = true;
@@ -533,7 +510,6 @@ public class ElasticsearchClient {
     public void refresh(String index) throws IOException{
         logger.debug("starting");
         RefreshRequest request = new RefreshRequest(index);
-        RestHighLevelClient client = getClient();
 
         client.indices().refresh(request, RequestOptions.DEFAULT);
 
@@ -840,7 +816,6 @@ public class ElasticsearchClient {
     }
 
     private void setNode(String index, String id, XContentBuilder builder) throws IOException {
-        RestHighLevelClient client = getClient();
         IndexRequest indexRequest = new IndexRequest(index)
                 .id(id).source(builder);
 
@@ -865,7 +840,6 @@ public class ElasticsearchClient {
     }
 
     private GetResponse get(String index, String id) throws IOException {
-        RestHighLevelClient client = getClient();
         GetRequest getRequest = new GetRequest(index,id);
         GetResponse resp = client.get(getRequest,RequestOptions.DEFAULT);
         return resp;
@@ -914,8 +888,6 @@ public class ElasticsearchClient {
 
     public void delete(List<Node> nodes) throws IOException {
         logger.info("starting size:"+nodes.size());
-        RestHighLevelClient client = getClient();
-
         BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
         for(Node node : nodes){
 
@@ -941,7 +913,6 @@ public class ElasticsearchClient {
      * @throws IOException
      */
     public void createIndexWorkspace() throws IOException {
-        RestHighLevelClient client = getClient();
         try {
             GetIndexRequest request = new GetIndexRequest(INDEX_WORKSPACE);
 
@@ -1088,7 +1059,6 @@ public class ElasticsearchClient {
     }
 
     public SearchHits search(String index, QueryBuilder queryBuilder, int from, int size) throws IOException {
-        RestHighLevelClient client = getClient();
         SearchRequest searchRequest = new SearchRequest(index);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(queryBuilder);
@@ -1098,45 +1068,5 @@ public class ElasticsearchClient {
         SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
         return searchResponse.getHits();
     }
-
-    RestHighLevelClient getClient() throws IOException{
-        if(client == null || !client.ping(RequestOptions.DEFAULT)){
-            client = new RestHighLevelClient(
-                RestClient.builder(
-                        new HttpHost(elasticHost, elasticPort, elasticProtocol)
-                        //,new HttpHost("localhost", 9201, "http")
-                )/*.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
-                        .setSocketTimeout(elasticSocketTimeout)
-                        .setConnectTimeout(elasticConnectTimeout)
-                        .setConnectionRequestTimeout(elasticConnectionRequestTimeout)));*/
-                        /*.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback(){
-                            @Override
-                            public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-                                IOReactorConfig.Builder ioReactorConfigBuilder = IOReactorConfig.copy(IOReactorConfig.DEFAULT);
-                                ioReactorConfigBuilder = ioReactorConfigBuilder.setConnectTimeout(elasticConnectTimeout);
-                               // ioReactorConfigBuilder = ioReactorConfigBuilder.setSoTimeout(elasticSocketTimeout);
-                               // ioReactorConfigBuilder = ioReactorConfigBuilder.se
-                                return httpClientBuilder.setDefaultIOReactorConfig(ioReactorConfigBuilder.build());
-                            }
-                        })*/
-                        .setRequestConfigCallback(
-                                new RestClientBuilder.RequestConfigCallback() {
-                                    @Override
-                                    public RequestConfig.Builder customizeRequestConfig(
-                                            RequestConfig.Builder requestConfigBuilder) {
-                                        return requestConfigBuilder
-                                                .setConnectTimeout(elasticConnectTimeout)
-                                                .setSocketTimeout(elasticSocketTimeout)
-                                                .setConnectionRequestTimeout(elasticConnectionRequestTimeout);
-
-                                    }
-                                }));
-
-        }
-
-        return client;
-    };
-
-
 
 }
