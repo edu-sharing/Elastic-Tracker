@@ -1,21 +1,22 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
+import com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider;
+import org.apache.cxf.feature.LoggingFeature;
+import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
 import org.apache.logging.log4j.LogManager;
-import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 @Component
 public class AlfrescoWebscriptClient {
@@ -45,17 +46,17 @@ public class AlfrescoWebscriptClient {
 
     String URL_PERMISSIONS = "/alfresco/service/api/solr/permissions";
 
-    org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
+    private static final org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
 
     private Client client;
 
 
 
-    public AlfrescoWebscriptClient(){
-        Logger logger = Logger.getLogger(getClass().getName());
-        Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
-
-        client = ClientBuilder.newBuilder().register(feature).build();
+    public AlfrescoWebscriptClient() {
+        client = ClientBuilder.newBuilder().register(new LoggingFeature())
+                .register(JacksonJsonProvider.class).build();
+        client.property("use.async.http.conduit", Boolean.TRUE);
+        client.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
     }
 
     public List<Node> getNodes(List<Long> transactionIds ){

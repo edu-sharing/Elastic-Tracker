@@ -1,40 +1,33 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
-import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicHeader;
+import com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider;
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+import org.apache.cxf.feature.LoggingFeature;
+import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
 import org.apache.logging.log4j.LogManager;
+import org.edu_sharing.elasticsearch.alfresco.client.AlfrescoWebscriptClient;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodePreview;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
-import org.glassfish.jersey.logging.LoggingFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StreamUtils;
 
 import javax.annotation.PostConstruct;
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 @Component
 public class EduSharingClient {
+
+    private static final org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
 
     @Value("${alfresco.host}")
     String alfrescoHost;
@@ -68,7 +61,9 @@ public class EduSharingClient {
     long valuespaceCacheLastModified = -1;
 
 
-    private Client client;
+    private Client educlient;
+
+    private String authorizationHeader;
 
     String URL_MDS_VALUES = "/edu-sharing/rest/mds/v1/metadatasetsV2/-home-/${mds}/values";
 
@@ -84,17 +79,16 @@ public class EduSharingClient {
 
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
-    org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
-
-
-    public EduSharingClient(){
-        Logger logger = Logger.getLogger(getClass().getName());
-        Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
-        client = ClientBuilder.newBuilder().register(feature).build();
-    }
-
     @PostConstruct
     public void init()  throws IOException {
+        authorizationHeader = "Basic "
+                + org.apache.cxf.common.util.Base64Utility.encode(String.format("%s:%s",alfrescoUsername,alfrescoPassword).getBytes());
+        educlient = ClientBuilder.newBuilder().register(new LoggingFeature())
+                .register(JacksonJsonProvider.class)
+                .register(PreviewDataReader.class).build();
+        educlient.property("use.async.http.conduit", Boolean.TRUE);
+        educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+
 
         MetadataSets metadataSets = getMetadataSets();
         for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
@@ -215,11 +209,11 @@ public class EduSharingClient {
         vp.setQuery("ngsearch");
         params.setValueParameters(vp);
 
-        entries = client
+        entries = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
                 .header("locale",language)
-                .header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword))
+                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
                 .post(Entity.json(params)).readEntity(ValuespaceEntries.class);
         addValuespaceToCache(mds, language, property, entries);
         return entries;
@@ -229,10 +223,10 @@ public class EduSharingClient {
         String url = new String(URL_MDS);
         url = url.replace("${mds}",mds);
         url = getUrl(url);
-        MdsV2 mdsV2 = client
+        MdsV2 mdsV2 = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword))
+                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
         .get().readEntity(MdsV2.class);
 
         List<String> result = new ArrayList<>();
@@ -280,24 +274,10 @@ public class EduSharingClient {
     }
 
     private PreviewData getPreviewData(String url) {
-        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-        HttpGet request = new HttpGet(url);
-        request.setHeader(new BasicHeader(
-                "Authorization",
-                "Basic " + Base64.getEncoder().encodeToString((alfrescoUsername + ":" + alfrescoPassword).getBytes())
-        ));
-        try {
-            PreviewData previewData = new PreviewData();
-            CloseableHttpResponse result = httpClient.execute(request);
-            previewData.setMimetype(result.getEntity().getContentType().getValue());
-            previewData.setData(StreamUtils.copyToByteArray(result.getEntity().getContent()));
-            logger.info("type: " + previewData.getMimetype() + ", size: " + previewData.getData().length);
-            result.close();
-            return previewData;
-        } catch(IOException e){
-            logger.warn("Could not fetch preview url "+url+": " + e.toString());
-            return null;
-        }
+        return educlient.target(url).
+                request(MediaType.WILDCARD).
+                header(HttpHeaders.AUTHORIZATION, authorizationHeader).
+                get().readEntity(PreviewData.class);
 
     }
 
@@ -305,7 +285,7 @@ public class EduSharingClient {
         String url = new String(URL_ABOUT);
         url = getUrl(url);
         try {
-            About about = client
+            About about = educlient
                     .target(url)
                     .request(MediaType.APPLICATION_JSON)
                     .get().readEntity(About.class);
@@ -319,19 +299,19 @@ public class EduSharingClient {
     public MetadataSets getMetadataSets(){
         String url = new String(URL_MDS_ALL);
         url = getUrl(url);
-        MetadataSets mdss = client.target(url).
-                request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword)).
+        return educlient.target(url)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
+                .accept(MediaType.APPLICATION_JSON).
                 get().readEntity(MetadataSets.class);
-        return mdss;
     }
 
     public Repository getHomeRepository(){
         String url = new String(URL_REPOSITORIES);
         url = getUrl(url);
-        Repositories repositories = client.target(url).
+        Repositories repositories = educlient.target(url).
                 request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, Tools.getBasicAuth(alfrescoUsername,alfrescoPassword)).
+                header(HttpHeaders.AUTHORIZATION, authorizationHeader).
                 get().readEntity(Repositories.class);
         for(Repository rep : repositories.getRepositories()){
             if(rep.isHomeRepo()) return rep;

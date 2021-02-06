@@ -1,7 +1,6 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
 import org.edu_sharing.elasticsearch.tools.Tools;
-import org.glassfish.jersey.logging.LoggingFeature;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -25,10 +24,7 @@ public class Test {
 
     String user = "admin";
     String password = "admin";
-
-    Logger logger = Logger.getLogger(Test.class.getName());
-    Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
-    Client client = ClientBuilder.newBuilder().register(feature).build();
+    Client client = ClientBuilder.newBuilder().build();
 
     public static void main(String[] args) {
 
