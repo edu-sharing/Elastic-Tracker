@@ -12,10 +12,8 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class AlfrescoWebscriptClient {
@@ -126,6 +124,10 @@ public class AlfrescoWebscriptClient {
         GetPermissionsParam getPermissionsParam = new GetPermissionsParam();
         getPermissionsParam.setAclIds(new ArrayList<Long>(acls));
         ReadersACL readersACL = this.getReader(getPermissionsParam);
+        AccessControlLists permissions = this.getAccessControlLists(getPermissionsParam);
+
+        Map<Long, AccessControlList> permissionsMap = permissions.getAccessControlLists().stream()
+                .collect(Collectors.toMap(AccessControlList::getAclId, accessControlList -> accessControlList));
 
         List<NodeData> result = new ArrayList<>();
         for(NodeMetadata nodeMetadata : nodes){
@@ -137,10 +139,7 @@ public class AlfrescoWebscriptClient {
                     NodeData nodeData = new NodeData();
                     nodeData.setNodeMetadata(nodeMetadata);
                     nodeData.setReader(reader);
-
-                    GetPermissionsParam getAcls = new GetPermissionsParam();
-                    getAcls.setAclIds(Arrays.asList(new Long[]{nodeMetadata.getAclId()} ));
-                    nodeData.setAccessControlList(this.getAccessControlLists(getPermissionsParam).getAccessControlLists().get(0));
+                    nodeData.setAccessControlList(permissionsMap.get(nodeMetadata.getAclId()));
                     result.add(nodeData);
                 }
             }
