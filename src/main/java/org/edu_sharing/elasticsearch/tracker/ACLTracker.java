@@ -1,13 +1,11 @@
 package org.edu_sharing.elasticsearch.tracker;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ACLChangeSet;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
-import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.SearchHits;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -43,7 +41,7 @@ public class ACLTracker {
 
     final static String storeWorkspace = "workspace://SpacesStore";
 
-    Logger logger = LogManager.getLogger(ACLTracker.class);
+    Logger logger = LoggerFactory.getLogger(ACLTracker.class);
 
     @PostConstruct
     public void init() throws IOException {

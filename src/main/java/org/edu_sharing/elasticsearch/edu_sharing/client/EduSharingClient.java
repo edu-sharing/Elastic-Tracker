@@ -3,11 +3,12 @@ package org.edu_sharing.elasticsearch.edu_sharing.client;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import org.apache.cxf.feature.LoggingFeature;
 import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
-import org.apache.logging.log4j.LogManager;
 import org.edu_sharing.elasticsearch.alfresco.client.NodeData;
 import org.edu_sharing.elasticsearch.alfresco.client.NodePreview;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,7 @@ import java.util.*;
 @Component
 public class EduSharingClient {
 
-    private static final org.apache.logging.log4j.Logger logger = LogManager.getLogger(EduSharingClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(EduSharingClient.class);
 
     @Value("${alfresco.host}")
     String alfrescoHost;
@@ -41,6 +42,9 @@ public class EduSharingClient {
 
     @Value("${alfresco.password}")
     String alfrescoPassword;
+
+    @Value("${log.requests}")
+    String logRequests;
 
 
     Map<String,Set<String>> valuespaceProps = new HashMap<>();
@@ -81,9 +85,12 @@ public class EduSharingClient {
     public void init()  throws IOException {
         authorizationHeader = "Basic "
                 + org.apache.cxf.common.util.Base64Utility.encode(String.format("%s:%s",alfrescoUsername,alfrescoPassword).getBytes());
-        educlient = ClientBuilder.newBuilder().register(new LoggingFeature())
+        educlient = ClientBuilder.newBuilder()
                 .register(JacksonJsonProvider.class)
                 .register(PreviewDataReader.class).build();
+        if (Boolean.parseBoolean(logRequests)) {
+            educlient.register(new LoggingFeature());
+        }
         educlient.property("use.async.http.conduit", Boolean.TRUE);
         educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
 

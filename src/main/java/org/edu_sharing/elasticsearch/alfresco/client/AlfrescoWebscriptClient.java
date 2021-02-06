@@ -3,7 +3,8 @@ package org.edu_sharing.elasticsearch.alfresco.client;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import org.apache.cxf.feature.LoggingFeature;
 import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
-import org.apache.logging.log4j.LogManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,9 @@ public class AlfrescoWebscriptClient {
     @Value("${alfresco.protocol}")
     String alfrescoProtocol;
 
+    @Value("${log.requests}")
+    String logRequests;
+
     String URL_TRANSACTIONS = "/alfresco/service/api/solr/transactions";
 
     String URL_NODES_TRANSACTION = "/alfresco/s/api/solr/nodes";
@@ -43,17 +47,20 @@ public class AlfrescoWebscriptClient {
 
     String URL_PERMISSIONS = "/alfresco/service/api/solr/permissions";
 
-    private static final org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(AlfrescoWebscriptClient.class);
 
     private Client client;
 
 
 
     public AlfrescoWebscriptClient() {
-        client = ClientBuilder.newBuilder().register(new LoggingFeature())
+        client = ClientBuilder.newBuilder()
                 .register(JacksonJsonProvider.class).build();
         client.property("use.async.http.conduit", Boolean.TRUE);
         client.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+        if (Boolean.parseBoolean(logRequests)) {
+            client.register(new LoggingFeature());
+        }
     }
 
     public List<Node> getNodes(List<Long> transactionIds ){

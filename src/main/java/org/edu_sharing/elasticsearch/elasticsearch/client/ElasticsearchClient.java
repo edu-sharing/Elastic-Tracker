@@ -6,8 +6,6 @@ import net.sourceforge.cardme.vcard.VCard;
 import net.sourceforge.cardme.vcard.exceptions.VCardParseException;
 import net.sourceforge.cardme.vcard.types.ExtendedType;
 import org.apache.http.HttpHost;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -45,6 +43,8 @@ import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -63,7 +63,7 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 @Component
 public class ElasticsearchClient {
 
-    private static final Logger logger = LogManager.getLogger(ElasticsearchClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(ElasticsearchClient.class);
 
     @Value("${elastic.host}")
     private String elasticHost;
@@ -176,7 +176,7 @@ public class ElasticsearchClient {
                 logger.error(failure.getMessage(),failure.getCause());
             }
         } catch (IOException e) {
-            logger.error(e);
+            logger.error("elastic request failed:", e);
         }
     }
 
@@ -515,7 +515,7 @@ public class ElasticsearchClient {
                         }else{
                             BulkItemResponse bir = (BulkItemResponse)item;
                             if(bir.getFailure() != null){
-                                logger.error(bir.getFailure().getCause());
+                                logger.error("bulk indexing error:", bir.getFailure().getCause());
                             }
                             logger.error("Failed indexing of " + bir.getFailureMessage());
                         }
@@ -902,7 +902,7 @@ public class ElasticsearchClient {
 
             setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET, builder);
         } catch (IOException e) {
-            logger.error(e);
+            logger.error("error indexing:",e);
         }
     }
 
