@@ -155,7 +155,7 @@ public class ElasticsearchClient {
         this.update(dbid,builder);
     }
 
-    public void updateNodesWithAcl(long aclId, Map<String,List<String>> permissions) throws IOException {
+    public void updateNodesWithAcl(final long aclId, final Map<String,List<String>> permissions) {
         logger.info("starting: {} ",aclId);
         UpdateByQueryRequest request = new UpdateByQueryRequest(INDEX_WORKSPACE);
         request.setQuery(QueryBuilders.termQuery("aclId", aclId));
@@ -167,11 +167,16 @@ public class ElasticsearchClient {
         Script script =  new Script(ScriptType.INLINE,Script.DEFAULT_SCRIPT_LANG,"ctx._source.permissions=params",param);
 
         request.setScript(script);
-        BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
-        logger.info("updated: {}", bulkByScrollResponse.getUpdated());
-        List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
-        for(BulkItemResponse.Failure failure : bulkFailures){
-            logger.error(failure.getMessage(),failure.getCause());
+        BulkByScrollResponse bulkByScrollResponse = null;
+        try {
+            bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
+            logger.info("updated: {}", bulkByScrollResponse.getUpdated());
+            List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
+            for(BulkItemResponse.Failure failure : bulkFailures){
+                logger.error(failure.getMessage(),failure.getCause());
+            }
+        } catch (IOException e) {
+            logger.error(e);
         }
     }
 
@@ -885,16 +890,20 @@ public class ElasticsearchClient {
     }
 
 
-    public void setACLChangeSet(long aclChangeSetTime, long aclChangeSetId) throws IOException {
-        XContentBuilder builder = jsonBuilder();
-        builder.startObject();
-        {
-            builder.field("aclChangeSetId", aclChangeSetId);
-            builder.field("aclChangeSetCommitTime",aclChangeSetTime);
-        }
-        builder.endObject();
+    public void setACLChangeSet(final long aclChangeSetTime, final long aclChangeSetId) {
+        try {
+            XContentBuilder builder = jsonBuilder();
+            builder.startObject();
+            {
+                builder.field("aclChangeSetId", aclChangeSetId);
+                builder.field("aclChangeSetCommitTime", aclChangeSetTime);
+            }
+            builder.endObject();
 
-        setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET,builder);
+            setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET, builder);
+        } catch (IOException e) {
+            logger.error(e);
+        }
     }
 
     public ACLChangeSet getACLChangeSet() throws IOException {
