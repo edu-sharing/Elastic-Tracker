@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Component
@@ -118,51 +119,58 @@ public class ACLTracker {
             param.getAclChangeSetIds().add(aclChangeSet.getId());
         }
 
-        try {
-            Acls acls = client.getAcls(param);
 
-            for (Acl acl : acls.getAcls()) {
+        Acls acls = client.getAcls(param);
 
-                GetPermissionsParam grp = new GetPermissionsParam();
-                grp.setAclIds(Arrays.asList(new Long[]{acl.getId()}));
-                ReadersACL readers = client.getReader(grp);
-                AccessControlLists accessControlLists = client.getAccessControlLists(grp);
+        GetPermissionsParam grp = new GetPermissionsParam();
+        Map<Long, Acl> aclIdMap = acls.getAcls().stream()
+                .collect(Collectors.toMap(Acl::getId, accessControlList -> accessControlList));
 
-                Reader reader = readers.getAclsReaders().get(0);
-                if(reader.getAclId() != acl.getId()){
-                    logger.error("reader aclid:" + reader.getAclId() +" does not match " +acl.getId());
-                    continue;
-                }
+        grp.setAclIds(new ArrayList<>(aclIdMap.keySet()));
+        ReadersACL readers = client.getReader(grp);
+        Map<Long, Reader> readersMap = readers.getAclsReaders().stream()
+                .collect(Collectors.toMap(Reader::getAclId, readersList -> readersList));
 
-                List<String> alfReader = reader.getReaders();
-                Collections.sort(alfReader);
-                /**
-                 *  alfresco permissions
-                 */
-                Map<String,List<String>> permissionsAlf = new HashMap<>();
-                for(AccessControlEntry ace : accessControlLists.getAccessControlLists().get(0).getAces()) {
-                    List<String> authorities = permissionsAlf.get(ace.getPermission());
-                    if (authorities == null) {
-                        authorities = new ArrayList<>();
-                    }
-                    if (!authorities.contains(ace.getAuthority())) {
-                        authorities.add(ace.getAuthority());
-                    }
-                    Collections.sort(authorities);
-                    permissionsAlf.put(ace.getPermission(), authorities);
-                }
-                if(alfReader != null && alfReader.size() > 0) {
-                    permissionsAlf.put("read", alfReader);
-                }
-                //sort alf map keys:
-                permissionsAlf = new TreeMap<>(permissionsAlf);
-                elasticClient.updateNodesWithAcl(acl.getId(),permissionsAlf);
+        logger.debug(grp.getAclIds().toString());
+        AccessControlLists accessControlLists = client.getAccessControlLists(grp);
+        Map<Long, AccessControlList> accessControlListMap = accessControlLists.getAccessControlLists().stream()
+                .collect(Collectors.toMap(AccessControlList::getAclId, accessControlList -> accessControlList));
+
+        for (Acl acl : acls.getAcls()) {
+
+            Reader reader = readersMap.get(acl.getId());
+            if (reader.getAclId() != acl.getId()) {
+                logger.error("reader aclid:" + reader.getAclId() + " does not match " + acl.getId());
+                continue;
             }
-            long lastAclChangesetid = aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() - 1).getId();
-            elasticClient.setACLChangeSet(lastFromCommitTime, lastAclChangesetid);
-        } catch (IOException e) {
-            logger.error("elastic search server not reachable", e);
+
+            List<String> alfReader = reader.getReaders();
+            Collections.sort(alfReader);
+            /**
+             *  alfresco permissions
+             */
+            Map<String, List<String>> permissionsAlf = new HashMap<>();
+            for (AccessControlEntry ace : accessControlListMap.get(acl.getId()).getAces()) {
+                List<String> authorities = permissionsAlf.get(ace.getPermission());
+                if (authorities == null) {
+                    authorities = new ArrayList<>();
+                }
+                if (!authorities.contains(ace.getAuthority())) {
+                    authorities.add(ace.getAuthority());
+                }
+                Collections.sort(authorities);
+                permissionsAlf.put(ace.getPermission(), authorities);
+            }
+            if (!alfReader.isEmpty()) {
+                permissionsAlf.put("read", alfReader);
+            }
+            //sort alf map keys:
+            permissionsAlf = new TreeMap<>(permissionsAlf);
+            Map<String, List<String>> finalPermissionsAlf = permissionsAlf;
+            CompletableFuture.runAsync(() -> elasticClient.updateNodesWithAcl(acl.getId(), finalPermissionsAlf));
         }
+        long lastAclChangesetid = aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() - 1).getId();
+        CompletableFuture.runAsync(() -> elasticClient.setACLChangeSet(lastFromCommitTime, lastAclChangesetid));
 
 
         logger.info("finished lastACLChangeSetId:" + last.getId());
