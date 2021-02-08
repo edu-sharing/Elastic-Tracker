@@ -98,8 +98,8 @@ public class TransactionTracker {
 
             lastTransactionId = newLastTransactionId;
             if(transactions.getMaxTxnId() <= lastTransactionId){
-                logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime);
-                return true;
+                logger.info("index is up to date:" + lastTransactionId + " lastFromCommitTime:" + lastFromCommitTime+" transactions.getMaxTxnId():"+transactions.getMaxTxnId());
+                return false;
             }else{
                 logger.info("did not found new transactions in last transaction block min:" + (lastTransactionId - TransactionTracker.maxResults) +" max:"+lastTransactionId  );
                 return true;
