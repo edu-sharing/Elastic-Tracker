@@ -1,108 +1,245 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.2.7.RELEASE</version>
-		<relativePath/> <!-- lookup parent from repository -->
-	</parent>
-	<groupId>org.edu_sharing.elasticsearch</groupId>
-	<artifactId>Edu-SharingElasticsearchTracker</artifactId>
-	<version>1.0.9-SNAPSHOT</version>
-	<name>Edu-Sharing Elasticsearch Tracker</name>
-	<description>Tracker for Elastic Search</description>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         										 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-	<properties>
-		<java.version>1.8</java.version>
-	</properties>
+  <modelVersion>4.0.0</modelVersion>
 
-	<dependencies>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>2.3.8.RELEASE</version>
+    <relativePath/> <!-- lookup parent from repository -->
+  </parent>
 
+  <groupId>org.edu_sharing</groupId>
+  <artifactId>edu_sharing-community-repository-backend-search-elastic-tracker</artifactId>
+  <version>git</version>
 
-		<!--Jersey JAX-RS client-->
-		<dependency>
-			<groupId>org.glassfish.jersey.core</groupId>
-			<artifactId>jersey-client</artifactId>
-			<version>2.29.1</version>
-		</dependency>
+  <name>edu_sharing-community-repository-backend-search-elastic-tracker</name>
+  <description>edu-sharing repository - tracker for elasticsearch</description>
 
-		<dependency>
-			<groupId>org.glassfish.jersey.media</groupId>
-			<artifactId>jersey-media-json-jackson</artifactId>
-			<version>2.29.1</version>
-		</dependency>
+  <url>https://edu-sharing.net</url>
 
-		<dependency>
-			<groupId>org.glassfish.jersey.core</groupId>
-			<artifactId>jersey-common</artifactId>
-			<version>2.29.1</version>
-		</dependency>
+  <inceptionYear>2020</inceptionYear>
 
-		<dependency>
-			<groupId>org.glassfish.jersey.inject</groupId>
-			<artifactId>jersey-hk2</artifactId>
-			<version>2.29.1</version>
-		</dependency>
+  <licenses>
+    <license>
+      <name>GNU General Public License v3.0</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
 
-		<!--dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter</artifactId>
-		</dependency>
+  <organization>
+    <name>metaventis GmbH</name>
+    <url>http://www.metaventis.com/</url>
+  </organization>
 
-		<!--elastic search-->
+  <scm>
+    <connection>scm:git:https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git</connection>
+    <developerConnection>scm:git:https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git
+    </developerConnection>
+    <url>https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git</url>
+  </scm>
 
-		<dependency>
-			<groupId>org.elasticsearch</groupId>
-			<artifactId>elasticsearch</artifactId>
-			<version>7.8.0</version>
-		</dependency>
+  <properties>
+    <deps.elasticsearch.version>7.8.0</deps.elasticsearch.version>
+    <deps.jersey.version>2.29.1</deps.jersey.version>
+    <java.version>1.8</java.version>
+  </properties>
 
-		<dependency>
-			<groupId>org.elasticsearch.client</groupId>
-			<artifactId>elasticsearch-rest-client</artifactId>
-			<version>7.8.0</version>
-		</dependency>
+  <dependencies>
 
-		<dependency>
-			<groupId>org.elasticsearch.client</groupId>
-			<artifactId>elasticsearch-rest-high-level-client</artifactId>
-			<version>7.8.0</version>
-		</dependency>
+    <dependency>
+      <groupId>net.sourceforge.cardme</groupId>
+      <artifactId>cardme</artifactId>
+      <version>0.4.0</version>
+    </dependency>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>org.junit.vintage</groupId>
-					<artifactId>junit-vintage-engine</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
+    <dependency>
+      <groupId>org.elasticsearch</groupId>
+      <artifactId>elasticsearch</artifactId>
+      <version>${deps.elasticsearch.version}</version>
+    </dependency>
 
-		<!-- https://mvnrepository.com/artifact/net.sourceforge.cardme/cardme -->
-		<dependency>
-			<groupId>net.sourceforge.cardme</groupId>
-			<artifactId>cardme</artifactId>
-			<version>0.4.0</version>
-		</dependency>
+    <dependency>
+      <groupId>org.elasticsearch.client</groupId>
+      <artifactId>elasticsearch-rest-client</artifactId>
+      <version>${deps.elasticsearch.version}</version>
+    </dependency>
 
-	</dependencies>
+    <dependency>
+      <groupId>org.elasticsearch.client</groupId>
+      <artifactId>elasticsearch-rest-high-level-client</artifactId>
+      <version>${deps.elasticsearch.version}</version>
+    </dependency>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-client</artifactId>
+      <version>${deps.jersey.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-common</artifactId>
+      <version>${deps.jersey.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.glassfish.jersey.inject</groupId>
+      <artifactId>jersey-hk2</artifactId>
+      <version>${deps.jersey.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-json-jackson</artifactId>
+      <version>${deps.jersey.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.junit.vintage</groupId>
+          <artifactId>junit-vintage-engine</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+
+    <profile>
+
+      <id>docker</id>
+
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <property>
+          <name>env.DOCKER_BUILD</name>
+          <value>true</value>
+        </property>
+      </activation>
+
+      <properties>
+
+        <docker.image>edusharing-repository-search-elastic-tracker</docker.image>
+        <docker.tag>${project.version}</docker.tag>
+        <docker.registry>community.docker.edu-sharing.com</docker.registry>
+        <docker.verbose>true</docker.verbose>
+
+      </properties>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>io.fabric8</groupId>
+            <artifactId>docker-maven-plugin</artifactId>
+            <version>0.34.1</version>
+            <configuration>
+              <images>
+                <image>
+                  <registry>${docker.registry}</registry>
+                  <name>${docker.image}:${docker.tag}</name>
+                  <build>
+                    <from>gcr.io/distroless/java:11</from>
+                    <assembly>
+                      <descriptorRef>artifact</descriptorRef>
+                    </assembly>
+                    <cmd>
+                      <arg>/maven/${project.artifactId}-${project.version}.jar</arg>
+                    </cmd>
+                  </build>
+                </image>
+              </images>
+            </configuration>
+            <executions>
+              <execution>
+                <id>build</id>
+                <goals>
+                  <goal>build</goal>
+                </goals>
+                <phase>install</phase>
+              </execution>
+              <execution>
+                <id>push</id>
+                <goals>
+                  <goal>push</goal>
+                </goals>
+                <phase>deploy</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+  <repositories>
+
+    <repository>
+      <id>edu-sharing.public.releases</id>
+      <url>https://artifacts.edu-sharing.com/repository/public-releases/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+
+    <repository>
+      <id>edu-sharing.public.snapshots</id>
+      <url>https://artifacts.edu-sharing.com/repository/public-snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+    </repository>
+
+  </repositories>
+
+  <distributionManagement>
+
+    <repository>
+      <id>edu-sharing.community.releases</id>
+      <url>https://artifacts.edu-sharing.com/repository/community-releases/</url>
+    </repository>
+
+    <snapshotRepository>
+      <id>edu-sharing.community.snapshots</id>
+      <url>https://artifacts.edu-sharing.com/repository/community-snapshots/</url>
+    </snapshotRepository>
+
+  </distributionManagement>
 
 </project>
