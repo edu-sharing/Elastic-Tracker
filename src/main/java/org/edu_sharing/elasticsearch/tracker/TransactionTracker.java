@@ -1,12 +1,12 @@
 package org.edu_sharing.elasticsearch.tracker;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.edu_sharing.elasticsearch.tools.Tools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -17,8 +17,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -49,7 +47,7 @@ public class TransactionTracker {
 
     final static int maxResults = 500;
 
-    Logger logger = LogManager.getLogger(TransactionTracker.class);
+    Logger logger = LoggerFactory.getLogger(TransactionTracker.class);
     private ForkJoinPool threadPool;
 
     @PostConstruct

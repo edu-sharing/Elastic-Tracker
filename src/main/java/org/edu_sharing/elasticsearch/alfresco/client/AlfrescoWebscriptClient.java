@@ -1,21 +1,20 @@
 package org.edu_sharing.elasticsearch.alfresco.client;
 
-import org.apache.logging.log4j.LogManager;
-import org.glassfish.jersey.logging.LoggingFeature;
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+import org.apache.cxf.feature.LoggingFeature;
+import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class AlfrescoWebscriptClient {
@@ -28,6 +27,9 @@ public class AlfrescoWebscriptClient {
 
     @Value("${alfresco.protocol}")
     String alfrescoProtocol;
+
+    @Value("${log.requests}")
+    String logRequests;
 
     String URL_TRANSACTIONS = "/alfresco/service/api/solr/transactions";
 
@@ -45,17 +47,20 @@ public class AlfrescoWebscriptClient {
 
     String URL_PERMISSIONS = "/alfresco/service/api/solr/permissions";
 
-    org.apache.logging.log4j.Logger logger = LogManager.getLogger(AlfrescoWebscriptClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(AlfrescoWebscriptClient.class);
 
     private Client client;
 
 
 
-    public AlfrescoWebscriptClient(){
-        Logger logger = Logger.getLogger(getClass().getName());
-        Feature feature = new LoggingFeature(logger, Level.FINEST, null, null);
-
-        client = ClientBuilder.newBuilder().register(feature).build();
+    public AlfrescoWebscriptClient() {
+        client = ClientBuilder.newBuilder()
+                .register(JacksonJsonProvider.class).build();
+        client.property("use.async.http.conduit", Boolean.TRUE);
+        client.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+        if (Boolean.parseBoolean(logRequests)) {
+            client.register(new LoggingFeature());
+        }
     }
 
     public List<Node> getNodes(List<Long> transactionIds ){
@@ -126,6 +131,10 @@ public class AlfrescoWebscriptClient {
         GetPermissionsParam getPermissionsParam = new GetPermissionsParam();
         getPermissionsParam.setAclIds(new ArrayList<Long>(acls));
         ReadersACL readersACL = this.getReader(getPermissionsParam);
+        AccessControlLists permissions = this.getAccessControlLists(getPermissionsParam);
+
+        Map<Long, AccessControlList> permissionsMap = permissions.getAccessControlLists().stream()
+                .collect(Collectors.toMap(AccessControlList::getAclId, accessControlList -> accessControlList));
 
         List<NodeData> result = new ArrayList<>();
         for(NodeMetadata nodeMetadata : nodes){
@@ -137,10 +146,7 @@ public class AlfrescoWebscriptClient {
                     NodeData nodeData = new NodeData();
                     nodeData.setNodeMetadata(nodeMetadata);
                     nodeData.setReader(reader);
-
-                    GetPermissionsParam getAcls = new GetPermissionsParam();
-                    getAcls.setAclIds(Arrays.asList(new Long[]{nodeMetadata.getAclId()} ));
-                    nodeData.setAccessControlList(this.getAccessControlLists(getPermissionsParam).getAccessControlLists().get(0));
+                    nodeData.setAccessControlList(permissionsMap.get(nodeMetadata.getAclId()));
                     result.add(nodeData);
                 }
             }

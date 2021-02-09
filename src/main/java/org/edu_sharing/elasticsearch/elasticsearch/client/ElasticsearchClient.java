@@ -60,12 +60,32 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 @Component
 public class ElasticsearchClient {
+
+    @Value("${elastic.host}")
+    String elasticHost;
+
+    @Value("${elastic.port}")
+    int elasticPort;
+
+    @Value("${elastic.protocol}")
+    String elasticProtocol;
+
+    @Value("${elastic.socketTimeout}")
+    int elasticSocketTimeout;
+
+    @Value("${elastic.connectTimeout}")
+    int elasticConnectTimeout;
+
+    @Value("${elastic.connectionRequestTimeout}")
+    int elasticConnectionRequestTimeout;
 
     Logger logger = LogManager.getLogger(ElasticsearchClient.class);
 
@@ -81,13 +101,12 @@ public class ElasticsearchClient {
 
     String homeRepoId;
 
-    @Autowired
     RestHighLevelClient client = null;
 
     @Autowired
     private EduSharingClient eduSharingClient;
-    private int nodeCounter;
-    private long lastNodeCount = System.currentTimeMillis();
+    private AtomicInteger nodeCounter = new AtomicInteger(0);
+    private AtomicLong lastNodeCount = new AtomicLong(System.currentTimeMillis());
 
     @Autowired
     private AlfrescoWebscriptClient alfrescoClient;
@@ -127,8 +146,8 @@ public class ElasticsearchClient {
         this.update(dbid,builder);
     }
 
-    public void updateNodesWithAcl(long aclId, Map<String,List<String>> permissions) throws IOException {
-        logger.info("starting: "+ aclId);
+    public void updateNodesWithAcl(final long aclId, final Map<String,List<String>> permissions) throws IOException {
+        logger.info("starting: {} ",aclId);
         UpdateByQueryRequest request = new UpdateByQueryRequest(INDEX_WORKSPACE);
         request.setQuery(QueryBuilders.termQuery("aclId", aclId));
         request.setConflicts("proceed");
@@ -140,7 +159,7 @@ public class ElasticsearchClient {
 
         request.setScript(script);
         BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
-        logger.info("updated: " + bulkByScrollResponse.getUpdated());
+        logger.info("updated: {}", bulkByScrollResponse.getUpdated());
         List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
         for(BulkItemResponse.Failure failure : bulkFailures){
             logger.error(failure.getMessage(),failure.getCause());
@@ -451,9 +470,9 @@ public class ElasticsearchClient {
                         }
                     }
                 }
-                if(nodeCounter++%100 == 0){
-                    logger.info("Processed " + nodeCounter +" nodes (" + (System.currentTimeMillis() - lastNodeCount) + "ms per last 100 nodes)");
-                    lastNodeCount = System.currentTimeMillis();
+                if(nodeCounter.addAndGet(1)%100 == 0){
+                    logger.info("Processed " + nodeCounter.get() +" nodes (" + (System.currentTimeMillis() - lastNodeCount.get()) + "ms per last 100 nodes)");
+                    lastNodeCount.set(System.currentTimeMillis());
                 }
 
         }
@@ -483,7 +502,7 @@ public class ElasticsearchClient {
                         }else{
                             BulkItemResponse bir = (BulkItemResponse)item;
                             if(bir.getFailure() != null){
-                                logger.error(bir.getFailure().getCause());
+                                logger.error("bulk indexing error:", bir.getFailure().getCause());
                             }
                             logger.error("Failed indexing of " + bir.getFailureMessage());
                         }
@@ -510,9 +529,7 @@ public class ElasticsearchClient {
     public void refresh(String index) throws IOException{
         logger.debug("starting");
         RefreshRequest request = new RefreshRequest(index);
-
         client.indices().refresh(request, RequestOptions.DEFAULT);
-
         logger.debug("returning");
     }
 
@@ -860,16 +877,16 @@ public class ElasticsearchClient {
     }
 
 
-    public void setACLChangeSet(long aclChangeSetTime, long aclChangeSetId) throws IOException {
-        XContentBuilder builder = jsonBuilder();
-        builder.startObject();
-        {
-            builder.field("aclChangeSetId", aclChangeSetId);
-            builder.field("aclChangeSetCommitTime",aclChangeSetTime);
-        }
-        builder.endObject();
+    public void setACLChangeSet(final long aclChangeSetTime, final long aclChangeSetId) throws IOException {
+            XContentBuilder builder = jsonBuilder();
+            builder.startObject();
+            {
+                builder.field("aclChangeSetId", aclChangeSetId);
+                builder.field("aclChangeSetCommitTime", aclChangeSetTime);
+            }
+            builder.endObject();
 
-        setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET,builder);
+            setNode(INDEX_TRANSACTIONS, ID_ACL_CHANGESET, builder);
     }
 
     public ACLChangeSet getACLChangeSet() throws IOException {
