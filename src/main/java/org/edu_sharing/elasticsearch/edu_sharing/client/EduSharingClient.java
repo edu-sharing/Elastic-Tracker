@@ -281,11 +281,15 @@ public class EduSharingClient {
     }
 
     private PreviewData getPreviewData(String url) {
-        return educlient.target(url).
-                request(MediaType.WILDCARD).
-                header(HttpHeaders.AUTHORIZATION, authorizationHeader).
-                get().readEntity(PreviewData.class);
-
+        try {
+            return educlient.target(url).
+                    request(MediaType.WILDCARD).
+                    header(HttpHeaders.AUTHORIZATION, authorizationHeader).
+                    get().readEntity(PreviewData.class);
+        }catch(Exception e) {
+            logger.info("Could not fetch preview from " + url, e);
+            return null;
+        }
     }
 
     public About getAbout(){
