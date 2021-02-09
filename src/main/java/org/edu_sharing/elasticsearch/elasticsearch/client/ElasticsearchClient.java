@@ -101,6 +101,7 @@ public class ElasticsearchClient {
 
     String homeRepoId;
 
+    @Autowired
     RestHighLevelClient client = null;
 
     @Autowired
