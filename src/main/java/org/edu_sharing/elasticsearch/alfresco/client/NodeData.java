@@ -13,6 +13,7 @@ public class NodeData {
 
     Map<String,List<String>> permissions;
 
+    List<NodeData> children = new ArrayList<>();
 
     Map<String, Map<String, List<String>>> valueSpaces = new HashMap<>();
 
@@ -72,5 +73,9 @@ public class NodeData {
 
     public Map<String,List<String>> getPermissions(){
         return permissions;
+    }
+
+    public List<NodeData> getChildren() {
+        return children;
     }
 }
