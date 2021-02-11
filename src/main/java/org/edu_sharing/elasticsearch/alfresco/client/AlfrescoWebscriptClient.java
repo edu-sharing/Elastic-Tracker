@@ -3,6 +3,7 @@ package org.edu_sharing.elasticsearch.alfresco.client;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import org.apache.cxf.feature.LoggingFeature;
 import org.apache.cxf.transport.http.asyncclient.AsyncHTTPConduitFactory;
+import org.edu_sharing.elasticsearch.tools.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -156,6 +157,21 @@ public class AlfrescoWebscriptClient {
         for(NodeData nodeData : result){
             String fullText = getTextContent(nodeData.getNodeMetadata().getId());
             if(fullText != null) nodeData.setFullText(fullText);
+
+            if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
+                List<Node> children = new ArrayList<>();
+                if(nodeData.getNodeMetadata().getChildIds() != null) {
+                    for (Long dbid : nodeData.getNodeMetadata().getChildIds()) {
+                        Node childNode = new Node();
+                        childNode.setId(dbid);
+                        children.add(childNode);
+                    }
+
+                    if (children.size() > 0) {
+                        nodeData.getChildren().addAll(getNodeData(this.getNodeMetadata(children)));
+                    }
+                }
+            }
         }
 
         return result;

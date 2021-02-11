@@ -34,6 +34,11 @@ public class Constants {
     public final static String CM_PROP_EDUMETADATASET = "{" + NAMESPACE_CM + "}edu_metadataset";
 
     private static Map<String, String> nameSpaceMap = null;
+
+    public final static String STORE_REF_WORKSPACE = "workspace://SpacesStore";
+
+    public final static String STORE_REF_ARCHIV = "archive://SpacesStore";
+
     /**
      * @return <namespace,localnamespace>
      */

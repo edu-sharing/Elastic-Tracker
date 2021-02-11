@@ -4,15 +4,19 @@ import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
+import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
+import org.elasticsearch.common.util.iterable.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.json.JsonParser;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -35,6 +39,8 @@ public class TransactionTracker {
 
     @Value("${allowed.types}")
     String allowedTypes;
+
+    List<String> subTypes = Arrays.asList(new String[]{"ccm:io","ccm:rating","ccm:comment","ccm:usage"});
 
     @Value("${index.storerefs}")
     List<String> indexStoreRefs;
@@ -193,7 +199,28 @@ public class TransactionTracker {
                     .collect(Collectors.toList());
 
             List<NodeMetadata> toIndexMd = new ArrayList<>();
+            List<Node> ioSubobjectChange = new ArrayList<>();
             for(NodeMetadata data : nodeData){
+
+                //force reindex of parent io to get subobjects
+                if(subTypes.contains(data.getType())
+                        && (!data.getType().equals("ccm:io") || data.getAspects().contains("ccm:io_childobject"))
+                        && Constants.STORE_REF_WORKSPACE.equals(Tools.getStoreRef(data.getNodeRef()))){
+
+                    String[] splitted = data.getPaths().get(0).getApath().split("/");
+                    String parentId = splitted[splitted.length -1];
+                    Serializable value = elasticClient.getProperty(Constants.STORE_REF_WORKSPACE+"/"+parentId,"dbid");
+                    if(value != null){
+                        Long parentDbid = ((Number)value).longValue();
+                        logger.info("FOUND PARENT IO WITH "+ parentDbid);
+                        //check if exists in list
+                        if(!nodeData.stream().anyMatch(n -> n.getId() == parentDbid)){
+                            Node n = new Node();
+                            n.setId(parentDbid);
+                            ioSubobjectChange.add(n);
+                        }
+                    }//else io does not exist in index
+                }
 
                 if(allowedTypes != null && !allowedTypes.trim().equals("")){
                     String[] allowedTypesArray = allowedTypes.split(",");
@@ -206,6 +233,11 @@ public class TransactionTracker {
                 }
                 toIndexMd.add(data);
             }
+
+            if(ioSubobjectChange.size() > 0){
+                toIndexMd.addAll(client.getNodeMetadata(ioSubobjectChange));
+            }
+
             List<NodeData> toIndex = client.getNodeData(toIndexMd);
             for(NodeData data: toIndex) {
                 threadPool.execute(() -> {

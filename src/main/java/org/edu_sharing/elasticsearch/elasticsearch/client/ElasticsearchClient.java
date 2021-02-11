@@ -44,6 +44,7 @@ import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.index.reindex.BulkByScrollResponse;
 import org.elasticsearch.index.reindex.UpdateByQueryRequest;
 import org.elasticsearch.script.Script;
@@ -219,263 +220,42 @@ public class ElasticsearchClient {
 
         for(NodeData nodeData: nodes) {
             NodeMetadata node = nodeData.getNodeMetadata();
-            String storeRefProtocol = Tools.getProtocol(node.getNodeRef());
-            String storeRefIdentifier = Tools.getIdentifier(node.getNodeRef());
-            String storeRef = Tools.getStoreRef(node.getNodeRef());
-                XContentBuilder builder = jsonBuilder();
-                builder.startObject();
-                {
-                    builder.field("aclId",  node.getAclId());
-                    builder.field("txnId",node.getTxnId());
-                    builder.field("dbid",node.getId());
+            XContentBuilder builder = get(nodeData,null);
 
-                    String id = node.getNodeRef().split("://")[1].split("/")[1];
-                    builder.startObject("nodeRef")
-                            .startObject("storeRef")
-                                .field("protocol",storeRefProtocol)
-                                .field("identifier",storeRefIdentifier)
-                            .endObject()
-                            .field("id",id)
-                    .endObject();
+            IndexRequest indexRequest = new IndexRequest(INDEX_WORKSPACE)
+                    .id(Long.toString(node.getId())).source(builder);
 
-                    builder.field("owner", node.getOwner());
-                    builder.field("type",node.getType());
-
-                    //valuespaces
-                    if(nodeData.getValueSpaces().size() > 0){
-                        builder.startObject("i18n");
-                        for(Map.Entry<String,Map<String,List<String>>> entry : nodeData.getValueSpaces().entrySet())      {
-                            String language = entry.getKey().split("-")[0];
-                            builder.startObject(language);
-                            for(Map.Entry<String,List<String>> valuespace : entry.getValue().entrySet() ){
-
-                                String key = Constants.getValidLocalName(valuespace.getKey());
-                                if(key != null) {
-                                    builder.field(key, valuespace.getValue());
-                                }else{
-                                    logger.error("unknown valuespace property: " + valuespace.getKey());
-                                }
-                            }
-                            builder.endObject();
-                        }
-                        builder.endObject();
-                    }
-
-                    if(node.getPaths() != null && node.getPaths().size() > 0){
-                        String[] pathEle = node.getPaths().get(0).getApath().split("/");
-                        builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
-                    }
-
-                    builder.startObject("permissions");
-                    builder.field("read",nodeData.getReader().getReaders());
-                    for(Map.Entry<String,List<String>> entry : nodeData.getPermissions().entrySet()){
-                        builder.field(entry.getKey(),entry.getValue());
-                    }
-                    builder.endObject();
-
-                    //content
-                    /**
-                     *     "{http://www.alfresco.org/model/content/1.0}content": {
-                     *    "contentId": "279",
-                     *    "encoding": "UTF-8",
-                     *    "locale": "de_DE_",
-                     *    "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                     *    "size": "8385"
-                     * },
-                     */
-                    LinkedHashMap content = (LinkedHashMap)node.getProperties().get("{http://www.alfresco.org/model/content/1.0}content");
-                    if(content != null){
-
-                        builder.startObject("content");
-                        builder.field("contentId", content.get("contentId"));
-                        builder.field("encoding", content.get("encoding"));
-                        builder.field("locale", content.get("locale"));
-                        builder.field("mimetype", content.get("mimetype"));
-                        builder.field("size", content.get("size"));
-                        if(nodeData.getFullText() != null){
-                            builder.field("fulltext", nodeData.getFullText());
-                        }
-                        builder.endObject();
-                    }
-
-
-                    HashMap<String,Serializable> contributorProperties = new HashMap<>();
-                    builder.startObject("properties");
-                    for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
-
-                        String key = Constants.getValidLocalName(prop.getKey());
-                        if(key == null){
-                            logger.error("unknown namespace: " + prop.getKey());
-                            continue;
-                        }
-
-                        Serializable value = prop.getValue();
-
-                        if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z]*")){
-                            if(value != null){
-                                contributorProperties.put(key,value);
-                            }
-                        }
-
-                        if(prop.getValue() instanceof List){
-                            List listvalue = (List)prop.getValue();
-
-                            //i.e. cm:title
-                            if( !listvalue.isEmpty() && listvalue.get(0) instanceof Map){
-                                value = getMultilangValue(listvalue);
-                            }
-
-                            //i.e. cclom:general_keyword
-                            if( !listvalue.isEmpty() && listvalue.get(0) instanceof List){
-                                List<String> mvValue = new ArrayList<String>();
-                                for(Object l : listvalue){
-                                    String mlv = getMultilangValue((List)l);
-                                    if(mlv != null) {
-                                        mvValue.add(mlv);
-                                    }
-                                }
-                                if(mvValue.size() > 0){
-                                    value = (Serializable) mvValue;
-                                }//fix: mapper_parsing_exception Preview of field's value: '{locale=de_}']] (empty keyword)
-                                else{
-                                    logger.info("fallback to \\”\\” for prop "+key +" v:" + value);
-                                    value = "";
-                                }
-                            }
-                        }
-                        if("cm:modified".equals(key) || "cm:created".equals(key)){
-
-                            if(prop.getValue() != null) {
-                                value = Date.from(Instant.parse((String) prop.getValue())).getTime();
-                            }
-                        }
-
-                        //prevent Elasticsearch exception failed to parse field's value: '1-01-07T01:00:00.000+01:00'
-                        if("ccm:replicationmodified".equals(key)){
-                            if(prop.getValue() != null) {
-                                value = prop.getValue().toString();
-                            }
-                        }
-
-                        //elastic maps this on date field, it gets a  failed to parse field exception when it's empty
-                        if("ccm:replicationsourcetimestamp".equals(key)){
-                            if(value != null && value.toString().trim().equals("")){
-                                value = null;
-                            }
-                        }
-
-                        if(value != null) {
-
-                            try {
-                                builder.field(key, value);
-                            }catch(MapperParsingException e){
-                                logger.error("error parsing value field:" + key +"v"+value,e);
-                            }
-                        }
-                    }
-                    builder.endObject();
-
-                    builder.field("aspects", node.getAspects());
-
-                    if(contributorProperties.size() > 0){
-                        VCardEngine vcardEngine = new VCardEngine();
-                        builder.startArray("contributor");
-                        for(Map.Entry<String,Serializable> entry : contributorProperties.entrySet()){
-                            if(entry.getValue() instanceof List){
-
-                                List<String> val = (List<String>)entry.getValue();
-                                for(String v : val){
-                                    try {
-                                        VCard vcard = vcardEngine.parse(v);
-                                        if(vcard != null){
-
-                                            builder.startObject();
-                                            builder.field("property",entry.getKey());
-                                            if(vcard.getN() != null){
-                                                builder.field("firstname",vcard.getN().getGivenName());
-                                                builder.field("lastname",vcard.getN().getFamilyName());
-                                            }
-                                            if(vcard.getEmails() != null && vcard.getEmails().size() > 0){
-                                                builder.field("email",vcard.getEmails().get(0).getEmail());
-                                            }
-                                            if(vcard.getUid() != null){
-                                                builder.field("uuid",vcard.getUid().getUid());
-                                            }
-                                            if(vcard.getUrls() != null && vcard.getUrls().size() > 0){
-                                                builder.field("url",vcard.getUrls().get(0).getRawUrl());
-                                            }
-
-                                            List<ExtendedType> extendedTypes = vcard.getExtendedTypes();
-                                            if(extendedTypes != null){
-                                                for(ExtendedType et : extendedTypes){
-                                                    if(et.getExtendedValue() != null && !et.getExtendedValue().trim().equals("")){
-                                                        builder.field(et.getExtendedName(), et.getExtendedValue());
-                                                    }
-                                                }
-                                            }
-
-
-                                            builder.field("vcard",v);
-                                            builder.endObject();
-                                        }
-                                    } catch (VCardParseException e) {
-                                        logger.error(e.getMessage(),e);
-                                    }
-                                }
-
-                            }
-                        }
-                        builder.endArray();
-                    }
-                    if(nodeData.getNodePreview() != null) {
-                        builder.startObject("preview").
-                                field("mimetype", nodeData.getNodePreview().getMimetype()).
-                                field("small", nodeData.getNodePreview().getSmall()).
-                                //field("large", nodeData.getNodePreview().getLarge()).
-                        endObject();
+            if(useBulkUpdate){
+                bulkRequest.add(indexRequest);
+            }else{
+                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+                String index = indexResponse.getIndex();
+                String id = indexResponse.getId();
+                if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
+                    logger.debug("created node in elastic:" + node);
+                } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
+                    logger.debug("updated node in elastic:" + node);
+                    if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
+                        this.refresh(INDEX_WORKSPACE);
+                        onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
                     }
                 }
-
-                builder.endObject();
-
-
-
-
-                IndexRequest indexRequest = new IndexRequest(INDEX_WORKSPACE)
-                        .id(Long.toString(node.getId())).source(builder);
-
-                if(useBulkUpdate){
-                    bulkRequest.add(indexRequest);
-                }else{
-                    IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                    String index = indexResponse.getIndex();
-                    String id = indexResponse.getId();
-                    if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
-                        logger.debug("created node in elastic:" + node);
-                    } else if (indexResponse.getResult() == DocWriteResponse.Result.UPDATED) {
-                        logger.debug("updated node in elastic:" + node);
-                        if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
-                            this.refresh(INDEX_WORKSPACE);
-                            onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
-                        }
-                    }
-                    ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
-                    if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
-                        logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
-                    }
-                    if (shardInfo.getFailed() > 0) {
-                        for (ReplicationResponse.ShardInfo.Failure failure :
-                                shardInfo.getFailures()) {
-                            String reason = failure.reason();
-                            logger.error(failure.nodeId() +" reason:"+reason);
-                        }
+                ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
+                if (shardInfo.getTotal() != shardInfo.getSuccessful()) {
+                    logger.debug("shardInfo.getTotal() "+shardInfo.getTotal() +"!="+ "shardInfo.getSuccessful():" +shardInfo.getSuccessful());
+                }
+                if (shardInfo.getFailed() > 0) {
+                    for (ReplicationResponse.ShardInfo.Failure failure :
+                            shardInfo.getFailures()) {
+                        String reason = failure.reason();
+                        logger.error(failure.nodeId() +" reason:"+reason);
                     }
                 }
-                if(nodeCounter.addAndGet(1)%100 == 0){
-                    logger.info("Processed " + nodeCounter.get() +" nodes (" + (System.currentTimeMillis() - lastNodeCount.get()) + "ms per last 100 nodes)");
-                    lastNodeCount.set(System.currentTimeMillis());
-                }
-
+            }
+            if(nodeCounter.addAndGet(1)%100 == 0){
+                logger.info("Processed " + nodeCounter.get() +" nodes (" + (System.currentTimeMillis() - lastNodeCount.get()) + "ms per last 100 nodes)");
+                lastNodeCount.set(System.currentTimeMillis());
+            }
         }
 
         if(useBulkUpdate && bulkRequest.numberOfActions() > 0) {
@@ -525,6 +305,241 @@ public class ElasticsearchClient {
 
         }
         logger.info("returning");
+    }
+
+    private XContentBuilder get(NodeData nodeData,XContentBuilder builder) throws IOException {
+
+        NodeMetadata node = nodeData.getNodeMetadata();
+        String storeRefProtocol = Tools.getProtocol(node.getNodeRef());
+        String storeRefIdentifier = Tools.getIdentifier(node.getNodeRef());
+
+        if(builder == null){
+            builder = jsonBuilder();
+        }
+
+        builder.startObject();
+        {
+            builder.field("aclId",  node.getAclId());
+            builder.field("txnId",node.getTxnId());
+            builder.field("dbid",node.getId());
+
+            String id = node.getNodeRef().split("://")[1].split("/")[1];
+            builder.startObject("nodeRef")
+                    .startObject("storeRef")
+                    .field("protocol",storeRefProtocol)
+                    .field("identifier",storeRefIdentifier)
+                    .endObject()
+                    .field("id",id)
+                    .endObject();
+
+            builder.field("owner", node.getOwner());
+            builder.field("type",node.getType());
+
+            //valuespaces
+            if(nodeData.getValueSpaces().size() > 0){
+                builder.startObject("i18n");
+                for(Map.Entry<String,Map<String,List<String>>> entry : nodeData.getValueSpaces().entrySet())      {
+                    String language = entry.getKey().split("-")[0];
+                    builder.startObject(language);
+                    for(Map.Entry<String,List<String>> valuespace : entry.getValue().entrySet() ){
+
+                        String key = Constants.getValidLocalName(valuespace.getKey());
+                        if(key != null) {
+                            builder.field(key, valuespace.getValue());
+                        }else{
+                            logger.error("unknown valuespace property: " + valuespace.getKey());
+                        }
+                    }
+                    builder.endObject();
+                }
+                builder.endObject();
+            }
+
+            if(node.getPaths() != null && node.getPaths().size() > 0){
+                String[] pathEle = node.getPaths().get(0).getApath().split("/");
+                builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
+            }
+
+            builder.startObject("permissions");
+            builder.field("read",nodeData.getReader().getReaders());
+            for(Map.Entry<String,List<String>> entry : nodeData.getPermissions().entrySet()){
+                builder.field(entry.getKey(),entry.getValue());
+            }
+            builder.endObject();
+
+            //content
+            /**
+             *     "{http://www.alfresco.org/model/content/1.0}content": {
+             *    "contentId": "279",
+             *    "encoding": "UTF-8",
+             *    "locale": "de_DE_",
+             *    "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+             *    "size": "8385"
+             * },
+             */
+            LinkedHashMap content = (LinkedHashMap)node.getProperties().get("{http://www.alfresco.org/model/content/1.0}content");
+            if(content != null){
+
+                builder.startObject("content");
+                builder.field("contentId", content.get("contentId"));
+                builder.field("encoding", content.get("encoding"));
+                builder.field("locale", content.get("locale"));
+                builder.field("mimetype", content.get("mimetype"));
+                builder.field("size", content.get("size"));
+                if(nodeData.getFullText() != null){
+                    builder.field("fulltext", nodeData.getFullText());
+                }
+                builder.endObject();
+            }
+
+
+            HashMap<String,Serializable> contributorProperties = new HashMap<>();
+            builder.startObject("properties");
+            for(Map.Entry<String, Serializable> prop : node.getProperties().entrySet()) {
+
+                String key = Constants.getValidLocalName(prop.getKey());
+                if(key == null){
+                    logger.error("unknown namespace: " + prop.getKey());
+                    continue;
+                }
+
+                Serializable value = prop.getValue();
+
+                if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z]*")){
+                    if(value != null){
+                        contributorProperties.put(key,value);
+                    }
+                }
+
+                if(prop.getValue() instanceof List){
+                    List listvalue = (List)prop.getValue();
+
+                    //i.e. cm:title
+                    if( !listvalue.isEmpty() && listvalue.get(0) instanceof Map){
+                        value = getMultilangValue(listvalue);
+                    }
+
+                    //i.e. cclom:general_keyword
+                    if( !listvalue.isEmpty() && listvalue.get(0) instanceof List){
+                        List<String> mvValue = new ArrayList<String>();
+                        for(Object l : listvalue){
+                            String mlv = getMultilangValue((List)l);
+                            if(mlv != null) {
+                                mvValue.add(mlv);
+                            }
+                        }
+                        if(mvValue.size() > 0){
+                            value = (Serializable) mvValue;
+                        }//fix: mapper_parsing_exception Preview of field's value: '{locale=de_}']] (empty keyword)
+                        else{
+                            logger.info("fallback to \\”\\” for prop "+key +" v:" + value);
+                            value = "";
+                        }
+                    }
+                }
+                if("cm:modified".equals(key) || "cm:created".equals(key)){
+
+                    if(prop.getValue() != null) {
+                        value = Date.from(Instant.parse((String) prop.getValue())).getTime();
+                    }
+                }
+
+                //prevent Elasticsearch exception failed to parse field's value: '1-01-07T01:00:00.000+01:00'
+                if("ccm:replicationmodified".equals(key)){
+                    if(prop.getValue() != null) {
+                        value = prop.getValue().toString();
+                    }
+                }
+
+                //elastic maps this on date field, it gets a  failed to parse field exception when it's empty
+                if("ccm:replicationsourcetimestamp".equals(key)){
+                    if(value != null && value.toString().trim().equals("")){
+                        value = null;
+                    }
+                }
+
+                if(value != null) {
+
+                    try {
+                        builder.field(key, value);
+                    }catch(MapperParsingException e){
+                        logger.error("error parsing value field:" + key +"v"+value,e);
+                    }
+                }
+            }
+            builder.endObject();
+
+            builder.field("aspects", node.getAspects());
+
+            if(contributorProperties.size() > 0){
+                VCardEngine vcardEngine = new VCardEngine();
+                builder.startArray("contributor");
+                for(Map.Entry<String,Serializable> entry : contributorProperties.entrySet()){
+                    if(entry.getValue() instanceof List){
+
+                        List<String> val = (List<String>)entry.getValue();
+                        for(String v : val){
+                            try {
+                                VCard vcard = vcardEngine.parse(v);
+                                if(vcard != null){
+
+                                    builder.startObject();
+                                    builder.field("property",entry.getKey());
+                                    if(vcard.getN() != null){
+                                        builder.field("firstname",vcard.getN().getGivenName());
+                                        builder.field("lastname",vcard.getN().getFamilyName());
+                                    }
+                                    if(vcard.getEmails() != null && vcard.getEmails().size() > 0){
+                                        builder.field("email",vcard.getEmails().get(0).getEmail());
+                                    }
+                                    if(vcard.getUid() != null){
+                                        builder.field("uuid",vcard.getUid().getUid());
+                                    }
+                                    if(vcard.getUrls() != null && vcard.getUrls().size() > 0){
+                                        builder.field("url",vcard.getUrls().get(0).getRawUrl());
+                                    }
+
+                                    List<ExtendedType> extendedTypes = vcard.getExtendedTypes();
+                                    if(extendedTypes != null){
+                                        for(ExtendedType et : extendedTypes){
+                                            if(et.getExtendedValue() != null && !et.getExtendedValue().trim().equals("")){
+                                                builder.field(et.getExtendedName(), et.getExtendedValue());
+                                            }
+                                        }
+                                    }
+
+
+                                    builder.field("vcard",v);
+                                    builder.endObject();
+                                }
+                            } catch (VCardParseException e) {
+                                logger.error(e.getMessage(),e);
+                            }
+                        }
+
+                    }
+                }
+                builder.endArray();
+            }
+            if(nodeData.getNodePreview() != null) {
+                builder.startObject("preview").
+                        field("mimetype", nodeData.getNodePreview().getMimetype()).
+                        field("small", nodeData.getNodePreview().getSmall()).
+                        //field("large", nodeData.getNodePreview().getLarge()).
+                                endObject();
+            }
+
+            if(nodeData.getChildren().size() > 0){
+                builder.startArray("children");
+                for(NodeData child : nodeData.getChildren()){
+                    get(child,builder);
+                }
+                builder.endArray();
+            }
+        }
+
+        builder.endObject();
+        return builder;
     }
 
     public void refresh(String index) throws IOException{
@@ -1085,6 +1100,24 @@ public class ElasticsearchClient {
         searchRequest.source(searchSourceBuilder);
         SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
         return searchResponse.getHits();
+    }
+
+    public Serializable getProperty(String nodeRef, String property) throws IOException {
+        String uuid = Tools.getUUID(nodeRef);
+        String protocol = Tools.getProtocol(nodeRef);
+        String identifier = Tools.getIdentifier(nodeRef);
+        QueryBuilder qb = QueryBuilders.boolQuery()
+                .must(QueryBuilders.termQuery("nodeRef.id",uuid))
+                .must(QueryBuilders.termQuery("nodeRef.storeRef.protocol",protocol))
+                .must(QueryBuilders.termQuery("nodeRef.storeRef.identifier",identifier));
+
+        SearchHits sh = this.search(INDEX_WORKSPACE,qb,0,1);
+        if(sh == null || sh.getTotalHits().value == 0){
+            return null;
+        }
+
+        SearchHit searchHit = sh.getHits()[0];
+        return (Serializable) searchHit.getSourceAsMap().get(property);
     }
 
 }
