@@ -95,6 +95,7 @@ public class EduSharingClient {
         educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
         // relevant for external previews or static previews (e.g. svg)
         educlient.property("http.autoredirect", true);
+        educlient.property("http.redirect.relative.uri", true);
 
 
         MetadataSets metadataSets = getMetadataSets();
