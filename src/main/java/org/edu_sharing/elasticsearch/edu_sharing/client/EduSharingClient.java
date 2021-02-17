@@ -17,6 +17,7 @@ import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
@@ -78,6 +79,10 @@ public class EduSharingClient {
     String URL_ABOUT = "/edu-sharing/rest/_about";
 
     String URL_REPOSITORIES = "/edu-sharing/rest/network/v1/repositories";
+
+    String URL_STATISTICS_ALTERED = "/edu-sharing/rest/statistic/v1/statistics/nodes/altered";
+
+    String URL_STATISTICS_NODE = "/edu-sharing/rest/statistic/v1/statistics/nodes/node";
 
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
@@ -329,6 +334,32 @@ public class EduSharingClient {
         }
         return null;
     }
+
+    public List<String> getStatisticsNodeIds(long timestamp){
+        String url = new String(URL_STATISTICS_ALTERED);
+        url = getUrl(url);
+
+        return educlient.target(url).
+                queryParam("dateFrom",timestamp).
+                request(MediaType.APPLICATION_JSON).
+                header(HttpHeaders.AUTHORIZATION, authorizationHeader).get().readEntity(List.class);
+    }
+
+
+    public List<NodeStatistic> getStatisticsForNode(String nodeId, long timestamp){
+        String url = new String(URL_STATISTICS_NODE);
+        url = getUrl(url);
+
+        return educlient.target(url).
+                path(nodeId).
+                queryParam("dateFrom",timestamp).
+                request(MediaType.APPLICATION_JSON).
+                header(HttpHeaders.AUTHORIZATION, authorizationHeader).get().readEntity(new GenericType<List<NodeStatistic>>(){});
+    }
+
+
+
+
 
 
     /**
