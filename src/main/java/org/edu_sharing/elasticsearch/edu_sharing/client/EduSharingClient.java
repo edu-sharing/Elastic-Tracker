@@ -206,6 +206,7 @@ public class EduSharingClient {
      * @param property
      * @return
      */
+    @EduSharingAuthentication.ManageAuthentication
     public ValuespaceEntries getValuespace(String mds, String language, String property ){
 
         ValuespaceEntries entries = getValuespaceFromCache(mds, language, property);
@@ -226,7 +227,6 @@ public class EduSharingClient {
         vp.setQuery("ngsearch");
         params.setValueParameters(vp);
 
-        manageAuthentication();
         entries = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
@@ -237,11 +237,11 @@ public class EduSharingClient {
         return entries;
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public List<String> getValuespaceProperties(String mds){
         String url = new String(URL_MDS);
         url = url.replace("${mds}",mds);
         url = getUrl(url);
-        manageAuthentication();
         MdsV2 mdsV2 = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
@@ -257,6 +257,7 @@ public class EduSharingClient {
         return result;
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public void addPreview(NodeData node){
         if(!fetchThumbnails){
             return;
@@ -293,8 +294,8 @@ public class EduSharingClient {
     }
 
     private PreviewData getPreviewData(String url) {
+        logger.info("calling getPreviewData");
         try {
-            manageAuthentication();
             return educlient.target(url).
                     request(MediaType.WILDCARD).
                     cookie(jsessionId.getName(),jsessionId.getValue()).
@@ -370,10 +371,10 @@ public class EduSharingClient {
         }
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public MetadataSets getMetadataSets(){
         String url = new String(URL_MDS_ALL);
         url = getUrl(url);
-        manageAuthentication();
         return educlient.target(url)
                 .request(MediaType.APPLICATION_JSON)
                 .cookie(jsessionId.getName(),jsessionId.getValue())
@@ -381,10 +382,10 @@ public class EduSharingClient {
                 .get().readEntity(MetadataSets.class);
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public Repository getHomeRepository(){
         String url = new String(URL_REPOSITORIES);
         url = getUrl(url);
-        manageAuthentication();
         Repositories repositories = educlient.target(url).
                 request(MediaType.APPLICATION_JSON).
                 cookie(jsessionId.getName(),jsessionId.getValue()).
@@ -450,5 +451,4 @@ public class EduSharingClient {
 
         propMap.put(property,entries);
     }
-
 }
