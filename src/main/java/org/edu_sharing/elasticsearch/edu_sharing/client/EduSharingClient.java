@@ -131,6 +131,7 @@ public class EduSharingClient {
         return result;
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public void translateValuespaceProps(NodeData data){
 
         Map<String, Serializable> properties = data.getNodeMetadata().getProperties();
@@ -206,7 +207,6 @@ public class EduSharingClient {
      * @param property
      * @return
      */
-    @EduSharingAuthentication.ManageAuthentication
     public ValuespaceEntries getValuespace(String mds, String language, String property ){
 
         ValuespaceEntries entries = getValuespaceFromCache(mds, language, property);
