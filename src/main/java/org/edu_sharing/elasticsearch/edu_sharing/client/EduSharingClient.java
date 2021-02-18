@@ -19,6 +19,8 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.NewCookie;
+import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
@@ -79,6 +81,12 @@ public class EduSharingClient {
 
     String URL_REPOSITORIES = "/edu-sharing/rest/network/v1/repositories";
 
+    String URL_VALIDATE_SESSION = "/edu-sharing/rest/authentication/v1/validateSession";
+
+    String URL_GET_USER = "/edu-sharing/rest/iam/v1/people/-home-/${user}";
+
+    NewCookie jsessionId = null;
+
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
     @PostConstruct
@@ -97,6 +105,7 @@ public class EduSharingClient {
         educlient.property("http.autoredirect", true);
         educlient.property("http.redirect.relative.uri", true);
 
+        authenticate();
 
         MetadataSets metadataSets = getMetadataSets();
         for(MetadataSet metadataSet : metadataSets.getMetadatasets()){
@@ -217,11 +226,12 @@ public class EduSharingClient {
         vp.setQuery("ngsearch");
         params.setValueParameters(vp);
 
+        manageAuthentication();
         entries = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
                 .header("locale",language)
-                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
+                .cookie(jsessionId.getName(),jsessionId.getValue())
                 .post(Entity.json(params)).readEntity(ValuespaceEntries.class);
         addValuespaceToCache(mds, language, property, entries);
         return entries;
@@ -231,10 +241,11 @@ public class EduSharingClient {
         String url = new String(URL_MDS);
         url = url.replace("${mds}",mds);
         url = getUrl(url);
+        manageAuthentication();
         MdsV2 mdsV2 = educlient
                 .target(url)
                 .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
+                .cookie(jsessionId.getName(),jsessionId.getValue())
         .get().readEntity(MdsV2.class);
 
         List<String> result = new ArrayList<>();
@@ -283,9 +294,10 @@ public class EduSharingClient {
 
     private PreviewData getPreviewData(String url) {
         try {
+            manageAuthentication();
             return educlient.target(url).
                     request(MediaType.WILDCARD).
-                    header(HttpHeaders.AUTHORIZATION, authorizationHeader).
+                    cookie(jsessionId.getName(),jsessionId.getValue()).
                     get().readEntity(PreviewData.class);
         }catch(Exception e) {
             logger.info("Could not fetch preview from " + url, e);
@@ -308,22 +320,74 @@ public class EduSharingClient {
         }
     }
 
+    public ValidateSessionResponse validateSession(){
+        logger.info("edu-sharing validateSession");
+        String url = new String(URL_VALIDATE_SESSION);
+        url = getUrl(url);
+        return educlient.
+                target(url).
+                request(MediaType.APPLICATION_JSON).
+                accept(MediaType.APPLICATION_JSON).
+                cookie(jsessionId.getName(),jsessionId.getValue()).
+                get().readEntity(ValidateSessionResponse.class);
+    }
+
+    public void authenticate() {
+        logger.info("edu-sharing authentication");
+
+        //auto redirect leads to endless loop when auth fails, tempory deactivate
+        educlient.property("http.autoredirect", false);
+        educlient.property("http.redirect.relative.uri", false);
+        try {
+            String url = new String(URL_GET_USER);
+            url = url.replace("${user}", alfrescoUsername);
+            url = getUrl(url);
+            Response response = educlient.target(url)
+                    .request(MediaType.APPLICATION_JSON)
+                    .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
+                    .accept(MediaType.APPLICATION_JSON).
+                            get();
+
+            if (response.getStatus() != 200) {
+                String message = "edu-sharing authentication failed:" + response.getStatus();
+                logger.error(message);
+                throw new RuntimeException(message);
+            }
+
+            jsessionId = response.getCookies().get("JSESSIONID");
+        }finally {
+            educlient.property("http.autoredirect", true);
+            educlient.property("http.redirect.relative.uri", true);
+        }
+
+    }
+
+    public void manageAuthentication(){
+        ValidateSessionResponse validateSessionResponse = this.validateSession();
+        if(!"OK".equals(validateSessionResponse.getStatusCode())){
+            logger.info("have to refresh edu-sharing cookie");
+            authenticate();
+        }
+    }
+
     public MetadataSets getMetadataSets(){
         String url = new String(URL_MDS_ALL);
         url = getUrl(url);
+        manageAuthentication();
         return educlient.target(url)
                 .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, authorizationHeader)
-                .accept(MediaType.APPLICATION_JSON).
-                get().readEntity(MetadataSets.class);
+                .cookie(jsessionId.getName(),jsessionId.getValue())
+                .accept(MediaType.APPLICATION_JSON)
+                .get().readEntity(MetadataSets.class);
     }
 
     public Repository getHomeRepository(){
         String url = new String(URL_REPOSITORIES);
         url = getUrl(url);
+        manageAuthentication();
         Repositories repositories = educlient.target(url).
                 request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, authorizationHeader).
+                cookie(jsessionId.getName(),jsessionId.getValue()).
                 get().readEntity(Repositories.class);
         for(Repository rep : repositories.getRepositories()){
             if(rep.isHomeRepo()) return rep;
