@@ -401,6 +401,7 @@ public class EduSharingClient {
         return null;
     }
 
+    @EduSharingAuthentication.ManageAuthentication
     public List<String> getStatisticsNodeIds(long timestamp){
         String url = new String(URL_STATISTICS_ALTERED);
         url = getUrl(url);
@@ -408,7 +409,8 @@ public class EduSharingClient {
         return educlient.target(url).
                 queryParam("dateFrom",timestamp).
                 request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, authorizationHeader).get().readEntity(List.class);
+                cookie(jsessionId.getName(),jsessionId.getValue()).
+                get().readEntity(List.class);
     }
 
 
