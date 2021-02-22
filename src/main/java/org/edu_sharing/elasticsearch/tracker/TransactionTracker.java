@@ -2,6 +2,7 @@ package org.edu_sharing.elasticsearch.tracker;
 
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.edu_sharing.client.NodeStatistic;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -17,10 +18,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -56,6 +54,9 @@ public class TransactionTracker {
     Logger logger = LoggerFactory.getLogger(TransactionTracker.class);
     private ForkJoinPool threadPool;
 
+    @Value("${statistic.historyInDays}")
+    long historyInDays;
+
     @PostConstruct
     public void init()  throws IOException{
         Tx txn = null;
@@ -79,6 +80,21 @@ public class TransactionTracker {
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
         eduSharingClient.refreshValuespaceCache();
+
+        ///test
+       /* long ts = System.currentTimeMillis() - 10000000;
+        List<String> statistics = eduSharingClient.getStatisticsNodeIds(ts);
+        for(String statistic : statistics){
+            System.out.println("statistics nodeId: "+statistic);
+            List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(statistic, ts);
+            for(NodeStatistic ns : statisticsForNode){
+                System.out.println("Statistic for node:" +ns.getTimestamp());
+                for(Map.Entry<String,Integer> entry : ns.getCounts().entrySet()){
+                    System.out.println("     " +entry.getKey() +" "+entry.getValue());
+                }
+            }
+
+        }*/
 
         Transactions transactions = (lastTransactionId < 1)
                 ? client.getTransactions(0L,500L,null,null, 1)
@@ -255,6 +271,19 @@ public class TransactionTracker {
             elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
             elasticClient.index(toIndex);
+
+            for(NodeData nodeDataStat : toIndex){
+                if(!"ccm:io".equals(nodeDataStat.getNodeMetadata().getType())
+                        || !Tools.getProtocol(nodeDataStat.getNodeMetadata().getNodeRef()).equals("workspace")){
+                    continue;
+                }
+                long trackTs = System.currentTimeMillis();
+                long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
+                String nodeId = Tools.getUUID(nodeDataStat.getNodeMetadata().getNodeRef());
+                List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(nodeId, trackFromTime);
+                elasticClient.updateNodeStatistics(nodeId,statisticsForNode);
+            }
+
             /**
              * refresh index so that collections will be found by cacheCollections process
              */
@@ -278,6 +307,13 @@ public class TransactionTracker {
         logger.info("finished lastTransactionId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
+
+       /* if(transactions.getMaxTxnId() <= lastTransactionId){
+            return false;
+        }else {
+            return true;
+        }*/
         return true;
+
     }
 }

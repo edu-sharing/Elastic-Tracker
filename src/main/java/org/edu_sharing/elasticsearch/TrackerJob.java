@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import org.edu_sharing.elasticsearch.tracker.ACLTracker;
+import org.edu_sharing.elasticsearch.tracker.StatisticsTracker;
 import org.edu_sharing.elasticsearch.tracker.TransactionTracker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,6 +19,9 @@ public class TrackerJob {
     @Autowired
     ACLTracker aclTracker;
 
+    @Autowired
+    StatisticsTracker statisticsTracker;
+
     Logger logger = LogManager.getLogger(TrackerJob.class);
 
     @Scheduled(fixedDelayString = "${tracker.delay}")
@@ -28,5 +32,9 @@ public class TrackerJob {
             logger.info("recursiv aclChanges:" + aclChanges +" transactionChanges:"+transactionChanges);
             track();
         }
+    }
+    @Scheduled(fixedDelayString = "${statistic.delay}")
+    public void trackStatistics(){
+        statisticsTracker.track();
     }
 }

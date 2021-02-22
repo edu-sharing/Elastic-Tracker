@@ -13,6 +13,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.edu_sharing.client.NodeStatistic;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
@@ -99,6 +100,8 @@ public class ElasticsearchClient {
     final static String ID_TRANSACTION = "1";
 
     final static String ID_ACL_CHANGESET = "2";
+
+    final static String ID_STATISTICS_TIMESTAMP ="3";
 
     String homeRepoId;
 
@@ -211,6 +214,8 @@ public class ElasticsearchClient {
             }
         }
     }
+
+
 
     public void index(List<NodeData> nodes) throws IOException{
         logger.info("starting");
@@ -918,6 +923,25 @@ public class ElasticsearchClient {
         return aclChangeSet;
     }
 
+    public void setStatisticTimestamp(long statisticTimestamp) throws IOException {
+        XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        {
+            builder.field("statisticTimestamp", statisticTimestamp);
+        }
+        builder.endObject();
+        setNode(INDEX_TRANSACTIONS, ID_STATISTICS_TIMESTAMP, builder);
+    }
+
+    public StatisticTimestamp getStatisticTimestamp() throws IOException {
+        GetResponse resp = this.get(INDEX_TRANSACTIONS, ID_STATISTICS_TIMESTAMP);
+        StatisticTimestamp sTs = null;
+        if(resp.isExists()){
+            sTs = new StatisticTimestamp();
+            sTs.setStatisticTimestamp(Long.parseLong(resp.getSource().get("statisticTimestamp").toString()));
+        }
+        return sTs;
+    }
 
     public void delete(List<Node> nodes) throws IOException {
         logger.info("starting size:"+nodes.size());
@@ -1118,6 +1142,43 @@ public class ElasticsearchClient {
 
         SearchHit searchHit = sh.getHits()[0];
         return (Serializable) searchHit.getSourceAsMap().get(property);
+    }
+
+    public void updateNodeStatistics(String uuid, List<NodeStatistic> statistics) throws IOException{
+
+        if(statistics.size() == 0){
+            return;
+        }
+
+        String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
+        Serializable value = this.getProperty(nodeRef,"dbid");
+        if(value == null){
+            logger.info("uuid:"+uuid+" is not in elastic index");
+            return;
+        }
+
+        Long dbid = ((Number)value).longValue();
+
+       XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        builder.startArray("statistics");
+        for(NodeStatistic nodeStatistic : statistics){
+            if(nodeStatistic == null){
+                logger.error("there is a null value in statistics list:"+nodeRef);
+                return;
+            }
+            builder.startObject();
+                builder.field("timestamp",nodeStatistic.getTimestamp());
+                builder.startObject("counts");
+                    for(Map.Entry<String,Integer> entry : nodeStatistic.getCounts().entrySet()){
+                        builder.field(entry.getKey(),entry.getValue());
+                    }
+                builder.endObject();
+            builder.endObject();
+        }
+        builder.endArray();
+        builder.endObject();
+        update(dbid,builder);
     }
 
 }
