@@ -281,7 +281,9 @@ public class TransactionTracker {
                 long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
                 String nodeId = Tools.getUUID(nodeDataStat.getNodeMetadata().getNodeRef());
                 List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(nodeId, trackFromTime);
-                elasticClient.updateNodeStatistics(nodeId,statisticsForNode);
+                Map<String,List<NodeStatistic>> updateNodeStatistics = new HashMap<>();
+                updateNodeStatistics.put(nodeId,statisticsForNode);
+                elasticClient.updateNodeStatistics(updateNodeStatistics);
             }
 
             /**

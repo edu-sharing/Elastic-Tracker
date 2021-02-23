@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class StatisticsTracker {
@@ -37,11 +39,13 @@ public class StatisticsTracker {
             long trackTs = System.currentTimeMillis();
             long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
 
+            Map<String,List<NodeStatistic>> nodeStatistics = new HashMap<>();
             List<String> statistics = eduSharingClient.getStatisticsNodeIds(trackFromTime);
             for(String nodeId : statistics){
                 List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(nodeId, trackFromTime);
-                elasticClient.updateNodeStatistics(nodeId,statisticsForNode);
+                nodeStatistics.put(nodeId,statisticsForNode);
             }
+            elasticClient.updateNodeStatistics(nodeStatistics);
             elasticClient.setStatisticTimestamp(trackTs);
         } catch (IOException e) {
             logger.error("problems reaching elastic search server");

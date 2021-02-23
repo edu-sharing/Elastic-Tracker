@@ -1144,41 +1144,55 @@ public class ElasticsearchClient {
         return (Serializable) searchHit.getSourceAsMap().get(property);
     }
 
-    public void updateNodeStatistics(String uuid, List<NodeStatistic> statistics) throws IOException{
+    public void updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
 
-        if(statistics.size() == 0){
-            return;
-        }
-
-        String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
-        Serializable value = this.getProperty(nodeRef,"dbid");
-        if(value == null){
-            logger.info("uuid:"+uuid+" is not in elastic index");
-            return;
-        }
-
-        Long dbid = ((Number)value).longValue();
-
-       XContentBuilder builder = jsonBuilder();
-        builder.startObject();
-        builder.startArray("statistics");
-        for(NodeStatistic nodeStatistic : statistics){
-            if(nodeStatistic == null){
-                logger.error("there is a null value in statistics list:"+nodeRef);
+        List<UpdateRequest> bulk = new ArrayList<>();
+        for(Map.Entry<String,List<NodeStatistic>> entry : nodeStatistics.entrySet()){
+            String uuid = entry.getKey();
+            List<NodeStatistic> statistics = entry.getValue();
+            if(statistics.size() == 0){
                 return;
             }
+
+            String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
+            Serializable value = this.getProperty(nodeRef,"dbid");
+            if(value == null){
+                logger.info("uuid:"+uuid+" is not in elastic index");
+                return;
+            }
+
+            Long dbid = ((Number)value).longValue();
+
+            XContentBuilder builder = jsonBuilder();
             builder.startObject();
+            builder.startArray("statistics");
+            for(NodeStatistic nodeStatistic : statistics){
+                if(nodeStatistic == null){
+                    logger.error("there is a null value in statistics list:"+nodeRef);
+                    return;
+                }
+                builder.startObject();
                 builder.field("timestamp",nodeStatistic.getTimestamp());
                 builder.startObject("counts");
-                    for(Map.Entry<String,Integer> entry : nodeStatistic.getCounts().entrySet()){
-                        builder.field(entry.getKey(),entry.getValue());
-                    }
+                for(Map.Entry<String,Integer> countsEntry : nodeStatistic.getCounts().entrySet()){
+                    builder.field(countsEntry.getKey(),countsEntry.getValue());
+                }
                 builder.endObject();
+                builder.endObject();
+            }
+            builder.endArray();
             builder.endObject();
+
+            UpdateRequest request = new UpdateRequest(
+                    INDEX_WORKSPACE,
+                    Long.toString(dbid)).doc(builder);
+
+            bulk.add(request);
         }
-        builder.endArray();
-        builder.endObject();
-        update(dbid,builder);
+
+        if(bulk.size() > 0){
+            this.updateBulk(bulk);
+        }
     }
 
 }
