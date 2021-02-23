@@ -1157,8 +1157,13 @@ public class ElasticsearchClient {
             String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
             Serializable value = this.getProperty(nodeRef,"dbid");
             if(value == null){
-                logger.info("uuid:"+uuid+" is not in elastic index");
-                return;
+                String nodeRefArchive = Constants.STORE_REF_ARCHIV+"/"+uuid;
+                value = this.getProperty(nodeRefArchive,"dbid");
+
+                if(value == null){
+                    logger.info("uuid:"+uuid+" is not in elastic in elastic index");
+                    return;
+                }
             }
 
             Long dbid = ((Number)value).longValue();
