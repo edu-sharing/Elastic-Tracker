@@ -1,6 +1,9 @@
 package org.edu_sharing.elasticsearch.edu_sharing.client;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ViewV2 {
 	private String id,caption,icon,html;
 	private String rel;
