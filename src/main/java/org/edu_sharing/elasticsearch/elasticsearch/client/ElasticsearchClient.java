@@ -404,8 +404,7 @@ public class ElasticsearchClient {
                 }
 
                 Serializable value = prop.getValue();
-
-                if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z]*")){
+                if(key.matches("ccm:[a-zA-Z]*contributer_[a-zA-Z_-]*")){
                     if(value != null){
                         contributorProperties.put(key,value);
                     }
