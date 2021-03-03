@@ -60,7 +60,10 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -102,6 +105,9 @@ public class ElasticsearchClient {
     final static String ID_ACL_CHANGESET = "2";
 
     final static String ID_STATISTICS_TIMESTAMP ="3";
+
+    SimpleDateFormat statisticDateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
 
     String homeRepoId;
 
@@ -1176,7 +1182,17 @@ public class ElasticsearchClient {
                     return;
                 }
                 builder.startObject();
-                builder.field("timestamp",nodeStatistic.getTimestamp());
+
+                builder.field("timestamp_string",nodeStatistic.getTimestamp() );
+                try {
+                    if(nodeStatistic.getTimestamp() != null){
+                        Date date = statisticDateFormatter.parse(nodeStatistic.getTimestamp());
+                        builder.field("timestamp",date.getTime());
+                    }
+
+                } catch (ParseException e) {
+                    logger.error(nodeStatistic.getTimestamp()+ " is no timestamp");
+                }
                 builder.startObject("counts");
                 for(Map.Entry<String,Integer> countsEntry : nodeStatistic.getCounts().entrySet()){
                     builder.field(countsEntry.getKey(),countsEntry.getValue());
