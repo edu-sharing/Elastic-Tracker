@@ -11,6 +11,7 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -356,8 +357,7 @@ public class ElasticsearchClient {
             }
 
             if(node.getPaths() != null && node.getPaths().size() > 0){
-                String[] pathEle = node.getPaths().get(0).getApath().split("/");
-                builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
+                addNodePath(builder, node);
             }
 
             builder.startObject("permissions");
@@ -539,6 +539,12 @@ public class ElasticsearchClient {
 
         builder.endObject();
         return builder;
+    }
+
+    private void addNodePath(XContentBuilder builder, NodeMetadata node) throws IOException {
+        String[] pathEle = node.getPaths().get(0).getApath().split("/");
+        builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
+        builder.field("fullpath", StringUtils.join(Arrays.asList(Arrays.copyOfRange(pathEle,1,pathEle.length - 1)), '/'));
     }
 
     public void refresh(String index) throws IOException{
@@ -1037,6 +1043,7 @@ public class ElasticsearchClient {
                     builder.startObject("type").field("type","keyword").endObject();
                     //leave out i18n cause it is dynamic
                     builder.startObject("path").field("type","keyword").endObject();
+                    builder.startObject("fullpath").field("type","keyword").endObject();
                     builder.startObject("permissions")
                             .startObject("properties")
                                 .startObject("read").field("type","keyword").endObject()
