@@ -11,7 +11,9 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
+import org.edu_sharing.elasticsearch.alfresco.client.Node;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
 import org.edu_sharing.elasticsearch.edu_sharing.client.NodeStatistic;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -19,6 +21,7 @@ import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
+import org.elasticsearch.action.admin.indices.settings.put.UpdateSettingsRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -33,12 +36,10 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
-import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.*;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
@@ -126,7 +127,14 @@ public class ElasticsearchClient {
     public void init() throws IOException {
         createIndexIfNotExists(INDEX_TRANSACTIONS);
         createIndexWorkspace();
+        setupElasticConfiguration();
         this.homeRepoId = eduSharingClient.getHomeRepository().getId();
+    }
+    private void setupElasticConfiguration() throws IOException {
+        UpdateSettingsRequest settingsRequest = new UpdateSettingsRequest();
+        // we need to increase this value because of the large ccm/cclom model
+        settingsRequest.settings(Settings.builder().put("index.mapping.total_fields.limit", 5000).build());
+        client.indices().putSettings(settingsRequest, RequestOptions.DEFAULT);
     }
     private void deleteIndex(String index) throws IOException{
         DeleteIndexRequest request = new DeleteIndexRequest(index);
@@ -367,8 +375,7 @@ public class ElasticsearchClient {
             }
 
             if(node.getPaths() != null && node.getPaths().size() > 0){
-                String[] pathEle = node.getPaths().get(0).getApath().split("/");
-                builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length - 1));
+                addNodePath(builder, node);
             }
 
             builder.startObject("permissions");
@@ -550,6 +557,12 @@ public class ElasticsearchClient {
 
         builder.endObject();
         return builder;
+    }
+
+    private void addNodePath(XContentBuilder builder, NodeMetadata node) throws IOException {
+        String[] pathEle = node.getPaths().get(0).getApath().split("/");
+        builder.field("path", Arrays.copyOfRange(pathEle,1,pathEle.length ));
+        builder.field("fullpath", StringUtils.join(Arrays.asList(Arrays.copyOfRange(pathEle,1,pathEle.length)), '/'));
     }
 
     public void refresh(String index) throws IOException{
@@ -1067,6 +1080,7 @@ public class ElasticsearchClient {
                     builder.startObject("type").field("type","keyword").endObject();
                     //leave out i18n cause it is dynamic
                     builder.startObject("path").field("type","keyword").endObject();
+                    builder.startObject("fullpath").field("type","keyword").endObject();
                     builder.startObject("permissions")
                             .startObject("properties")
                                 .startObject("read").field("type","keyword").endObject()
