@@ -21,6 +21,7 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Component
@@ -80,21 +81,6 @@ public class TransactionTracker {
         logger.info("starting lastTransactionId:" +lastTransactionId+ " lastFromCommitTime:" + lastFromCommitTime +" " +  new Date(lastFromCommitTime));
 
         eduSharingClient.refreshValuespaceCache();
-
-        ///test
-       /* long ts = System.currentTimeMillis() - 10000000;
-        List<String> statistics = eduSharingClient.getStatisticsNodeIds(ts);
-        for(String statistic : statistics){
-            System.out.println("statistics nodeId: "+statistic);
-            List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(statistic, ts);
-            for(NodeStatistic ns : statisticsForNode){
-                System.out.println("Statistic for node:" +ns.getTimestamp());
-                for(Map.Entry<String,Integer> entry : ns.getCounts().entrySet()){
-                    System.out.println("     " +entry.getKey() +" "+entry.getValue());
-                }
-            }
-
-        }*/
 
         Transactions transactions = (lastTransactionId < 1)
                 ? client.getTransactions(0L,500L,null,null, 1)
@@ -270,7 +256,14 @@ public class TransactionTracker {
 
             elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
-            elasticClient.index(toIndex);
+            final AtomicInteger counter = new AtomicInteger(0);
+            final int size = 50;
+            final Collection<List<NodeData>> partitioned = toIndex.stream()
+                    .collect(Collectors.groupingBy(it -> counter.getAndIncrement() / size))
+                    .values();
+            for(List<NodeData> p : partitioned){
+                elasticClient.index(p);
+            }
 
             for(NodeData nodeDataStat : toIndex){
                 if(!"ccm:io".equals(nodeDataStat.getNodeMetadata().getType())
@@ -309,13 +302,6 @@ public class TransactionTracker {
         logger.info("finished lastTransactionId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
-
-       /* if(transactions.getMaxTxnId() <= lastTransactionId){
-            return false;
-        }else {
-            return true;
-        }*/
         return true;
-
     }
 }

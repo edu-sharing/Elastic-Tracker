@@ -232,7 +232,7 @@ public class ElasticsearchClient {
 
 
     public void index(List<NodeData> nodes) throws IOException{
-        logger.info("starting");
+        logger.info("starting bulk index for {}",nodes.size());
 
         BulkRequest bulkRequest = new BulkRequest(INDEX_WORKSPACE);
         boolean useBulkUpdate = true;
