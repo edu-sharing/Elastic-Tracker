@@ -327,7 +327,7 @@ public class EduSharingClient {
     }
 
     public ValidateSessionResponse validateSession(){
-        logger.info("edu-sharing validateSession");
+        logger.debug("edu-sharing validateSession");
         String url = new String(URL_VALIDATE_SESSION);
         url = getUrl(url);
         return educlient.

@@ -166,7 +166,7 @@ public class ElasticsearchClient {
     }
 
     public void updateNodesWithAcl(final long aclId, final Map<String,List<String>> permissions) throws IOException {
-        logger.info("starting: {} ",aclId);
+        logger.debug("starting: {} ",aclId);
         UpdateByQueryRequest request = new UpdateByQueryRequest(INDEX_WORKSPACE);
         request.setQuery(QueryBuilders.termQuery("aclId", aclId));
         request.setConflicts("proceed");
@@ -178,7 +178,7 @@ public class ElasticsearchClient {
 
         request.setScript(script);
         BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
-        logger.info("updated: {}", bulkByScrollResponse.getUpdated());
+        logger.debug("updated: {}", bulkByScrollResponse.getUpdated());
         List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
         for(BulkItemResponse.Failure failure : bulkFailures){
             logger.error(failure.getMessage(),failure.getCause());

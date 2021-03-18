@@ -26,7 +26,7 @@ public class EduSharingAuthentication {
 
     @Before("@annotation(org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingAuthentication.ManageAuthentication)")
     public void manageAuthentication(JoinPoint joinPoint) throws Throwable {
-        logger.info("manageAuthentication for:" + joinPoint.getSignature().getName());
+        logger.debug("manageAuthentication for:" + joinPoint.getSignature().getName());
         eduSharingClient.manageAuthentication();
     }
 
