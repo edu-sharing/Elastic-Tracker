@@ -57,8 +57,8 @@ public class AlfrescoWebscriptClient {
     public AlfrescoWebscriptClient() {
         client = ClientBuilder.newBuilder()
                 .register(JacksonJsonProvider.class).build();
-        client.property("use.async.http.conduit", Boolean.TRUE);
-        client.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+        //client.property("use.async.http.conduit", Boolean.TRUE);
+        //client.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
         if (Boolean.parseBoolean(logRequests)) {
             client.register(new LoggingFeature());
         }
