@@ -552,6 +552,32 @@ public class ElasticsearchClient {
                     get(child,builder);
                 }
                 builder.endArray();
+
+                Map<Date,Double> ratings = new HashMap<>();
+                double ratingAll = 0;
+                for(NodeData child : nodeData.getChildren()){
+                    if("ccm:rating".equals(child.getNodeMetadata().getType())){
+                        Date modified = Date.from(Instant.parse((String) child.getNodeMetadata().getProperties().get(Constants.getValidGlobalName("cm:modified"))));
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTime(modified);
+                        cal.set(Calendar.HOUR_OF_DAY,0);
+                        cal.clear(Calendar.MINUTE);
+                        cal.clear(Calendar.SECOND);
+                        cal.clear(Calendar.MILLISECOND);
+                        Date date = cal.getTime();
+                        Double sum = ratings.get(date);
+                        Double rating = Double.parseDouble((String)child.getNodeMetadata().getProperties().get(Constants.getValidGlobalName("ccm:rating_value")));
+                        ratingAll+=rating;
+                        sum = (sum == null) ? rating : sum + rating;
+                        ratings.put(date,sum);
+                    }
+                }
+                for(Map.Entry<Date,Double> rating : ratings.entrySet()){
+                    builder.field("rating_"+statisticDateFormatter.format(rating.getKey()),rating.getValue());
+                }
+                if("ccm:io".equals(nodeData.getNodeMetadata().getType())) {
+                    builder.field("rating_null", ratingAll);
+                }
             }
         }
 
@@ -1188,7 +1214,33 @@ public class ElasticsearchClient {
             Long dbid = ((Number)value).longValue();
 
             XContentBuilder builder = jsonBuilder();
+            Map<String,Integer> dayCountsView = new HashMap<>();
+            Map<String,Integer> dayCountsDownload = new HashMap<>();
+
+            if(statistics == null || statistics.size() == 0) continue;
+
             builder.startObject();
+            for(NodeStatistic nodeStatistic : statistics){
+                if(nodeStatistic == null){
+                    logger.error("there is a null value in statistics list:"+nodeRef);
+                    continue;
+                }
+                if(nodeStatistic.getCounts() == null || nodeStatistic.getCounts().size() == 0) continue;
+                String DOWNLOAD = "DOWNLOAD_MATERIAL";
+                String VIEW = "VIEW_MATERIAL";
+                String fieldNameDownload = "statistic_" +DOWNLOAD +"_"+ nodeStatistic.getTimestamp();
+                String fieldNameView = "statistic_" +VIEW +"_"+ nodeStatistic.getTimestamp();
+                Integer download = nodeStatistic.getCounts().get(DOWNLOAD);
+                Integer view = nodeStatistic.getCounts().get(VIEW);
+                if(download != null && download > 0){
+                    builder.field(fieldNameDownload,download);
+                }
+                if(view != null && view > 0){
+                    builder.field(fieldNameView,view);
+                }
+
+            }
+            /*
             builder.startArray("statistics");
             for(NodeStatistic nodeStatistic : statistics){
                 if(nodeStatistic == null){
@@ -1214,7 +1266,7 @@ public class ElasticsearchClient {
                 builder.endObject();
                 builder.endObject();
             }
-            builder.endArray();
+            builder.endArray();*/
             builder.endObject();
 
             UpdateRequest request = new UpdateRequest(
