@@ -17,12 +17,10 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Component
@@ -254,7 +252,15 @@ public class TransactionTracker {
 
             elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
-            elasticClient.index(toIndex);
+            final AtomicInteger counter = new AtomicInteger(0);
+            final int size = 50;
+            final Collection<List<NodeData>> partitioned = toIndex.stream()
+                    .collect(Collectors.groupingBy(it -> counter.getAndIncrement() / size))
+                    .values();
+            for(List<NodeData> p : partitioned){
+                elasticClient.index(p);
+            }
+
             /**
              * refresh index so that collections will be found by cacheCollections process
              */
