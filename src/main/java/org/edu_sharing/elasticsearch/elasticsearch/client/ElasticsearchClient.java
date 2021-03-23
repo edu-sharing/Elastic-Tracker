@@ -573,10 +573,10 @@ public class ElasticsearchClient {
                     }
                 }
                 for(Map.Entry<Date,Double> rating : ratings.entrySet()){
-                    builder.field("rating_"+statisticDateFormatter.format(rating.getKey()),rating.getValue());
+                    builder.field("statistic_RATING_"+statisticDateFormatter.format(rating.getKey()),rating.getValue());
                 }
                 if("ccm:io".equals(nodeData.getNodeMetadata().getType())) {
-                    builder.field("rating_null", ratingAll);
+                    builder.field("statistic_RATING_null", ratingAll);
                 }
             }
         }
