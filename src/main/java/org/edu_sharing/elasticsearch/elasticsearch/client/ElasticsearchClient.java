@@ -68,6 +68,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -92,6 +93,9 @@ public class ElasticsearchClient {
 
     @Value("${elastic.connectionRequestTimeout}")
     int elasticConnectionRequestTimeout;
+
+    @Value("${statistic.historyInDays}")
+    int statisticHistoryInDays;
 
     Logger logger = LogManager.getLogger(ElasticsearchClient.class);
 
@@ -1279,6 +1283,51 @@ public class ElasticsearchClient {
         if(bulk.size() > 0){
             this.updateBulk(bulk);
         }
+    }
+
+    public void cleanUpNodeStatistics(NodeData nodeData) throws IOException {
+        logger.info("starting cleanUpNodeStatistics");
+
+        if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
+            List<String> propsToRemove = new ArrayList<>();
+            String id = new Long(nodeData.getNodeMetadata().getId()).toString();
+            GetResponse resp = get(INDEX_WORKSPACE,id);
+            for(Map.Entry<String,Object> entry : resp.getSource().entrySet()){
+                if(entry.getKey().startsWith("statistic_")
+                        && !entry.getKey().startsWith("statistic_RATING")){
+                    String prefixPattern = "statistic_[a-zA-Z_]*";
+                    String datePattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}";
+                    if(entry.getKey().matches(prefixPattern+datePattern)){
+                        String[] split = Pattern.compile(prefixPattern).split(entry.getKey());
+
+                        try {
+                            Calendar cal = Calendar.getInstance();
+                            cal.add(Calendar.DAY_OF_YEAR,-statisticHistoryInDays);
+                            Date date = statisticDateFormatter.parse(split[1]);
+                            if(cal.getTime().getTime() > date.getTime()){
+                                propsToRemove.add(entry.getKey());
+                            }
+                        } catch (ParseException e) {
+                            logger.error("can not get date in: "+entry.getKey());
+                        }
+                    }
+                }
+            }
+            if(propsToRemove.size() == 0) return;
+            Map<String,Object> params = new HashMap<>();
+            params.put("propsToRemove",propsToRemove);
+            Script inline = new Script(ScriptType.INLINE,
+                    "painless",
+                    "for(String prop : params.propsToRemove){ctx._source.remove(prop)}",
+                     params);
+            UpdateRequest request = new UpdateRequest(INDEX_WORKSPACE,id);
+            request.script(inline);
+            logger.info("remove for "+id+": "+String.join(",",propsToRemove));
+
+            this.update(request);
+        }
+
+        logger.info("returning cleanUpNodeStatistics");
     }
 
 }

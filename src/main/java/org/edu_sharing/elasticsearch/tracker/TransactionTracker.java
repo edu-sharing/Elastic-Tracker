@@ -264,7 +264,6 @@ public class TransactionTracker {
             for(List<NodeData> p : partitioned){
                 elasticClient.index(p);
             }
-
             for(NodeData nodeDataStat : toIndex){
                 if(!"ccm:io".equals(nodeDataStat.getNodeMetadata().getType())
                         || !Tools.getProtocol(nodeDataStat.getNodeMetadata().getNodeRef()).equals("workspace")){
@@ -277,6 +276,8 @@ public class TransactionTracker {
                 Map<String,List<NodeStatistic>> updateNodeStatistics = new HashMap<>();
                 updateNodeStatistics.put(nodeId,statisticsForNode);
                 elasticClient.updateNodeStatistics(updateNodeStatistics);
+                //we don't need cleanup cause former elasticClient.index(..) call removes all statistic data
+                //elasticClient.cleanUpNodeStatistics(nodeDataStat);
             }
 
             /**
