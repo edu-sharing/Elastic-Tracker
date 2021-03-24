@@ -1176,6 +1176,10 @@ public class ElasticsearchClient {
     }
 
     public Serializable getProperty(String nodeRef, String property) throws IOException {
+       return (Serializable)getSourceMap(nodeRef).get(property);
+    }
+
+    public Map<String,Object> getSourceMap(String nodeRef) throws IOException {
         String uuid = Tools.getUUID(nodeRef);
         String protocol = Tools.getProtocol(nodeRef);
         String identifier = Tools.getIdentifier(nodeRef);
@@ -1190,7 +1194,7 @@ public class ElasticsearchClient {
         }
 
         SearchHit searchHit = sh.getHits()[0];
-        return (Serializable) searchHit.getSourceAsMap().get(property);
+        return searchHit.getSourceAsMap();
     }
 
     public void updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
@@ -1285,14 +1289,32 @@ public class ElasticsearchClient {
         }
     }
 
-    public void cleanUpNodeStatistics(NodeData nodeData) throws IOException {
+
+    public void cleanUpNodeStatistics(List<String> nodeUuids) throws IOException {
+        for(String uuid : nodeUuids){
+            cleanUpNodeStatistics(uuid);
+        }
+    }
+
+
+    public void cleanUpNodeStatistics(String nodeUuid) throws IOException {
         logger.info("starting cleanUpNodeStatistics");
 
-        if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
+        Map<String, Object> sourceMap = getSourceMap("workspace://SpacesStore/" + nodeUuid);
+        if(sourceMap == null){
+            return;
+        }
+
+        long dbid = ((Number)sourceMap.get("dbid")).longValue();
+        String id = new Long(dbid).toString();
+        String type = (String)sourceMap.get("type");
+
+        if("ccm:io".equals(type)){
             List<String> propsToRemove = new ArrayList<>();
-            String id = new Long(nodeData.getNodeMetadata().getId()).toString();
-            GetResponse resp = get(INDEX_WORKSPACE,id);
-            for(Map.Entry<String,Object> entry : resp.getSource().entrySet()){
+
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR,-statisticHistoryInDays);
+            for(Map.Entry<String,Object> entry : sourceMap.entrySet()){
                 if(entry.getKey().startsWith("statistic_")
                         && !entry.getKey().startsWith("statistic_RATING")){
                     String prefixPattern = "statistic_[a-zA-Z_]*";
@@ -1301,8 +1323,7 @@ public class ElasticsearchClient {
                         String[] split = Pattern.compile(prefixPattern).split(entry.getKey());
 
                         try {
-                            Calendar cal = Calendar.getInstance();
-                            cal.add(Calendar.DAY_OF_YEAR,-statisticHistoryInDays);
+
                             Date date = statisticDateFormatter.parse(split[1]);
                             if(cal.getTime().getTime() > date.getTime()){
                                 propsToRemove.add(entry.getKey());

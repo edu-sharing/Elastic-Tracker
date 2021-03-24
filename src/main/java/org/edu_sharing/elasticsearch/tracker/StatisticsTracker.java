@@ -41,12 +41,15 @@ public class StatisticsTracker {
 
             Map<String,List<NodeStatistic>> nodeStatistics = new HashMap<>();
             List<String> statistics = eduSharingClient.getStatisticsNodeIds(trackFromTime);
+            logger.info("found "+statistics.size() + " statistic changes");
             for(String nodeId : statistics){
                 List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(nodeId, trackFromTime);
                 nodeStatistics.put(nodeId,statisticsForNode);
             }
             elasticClient.updateNodeStatistics(nodeStatistics);
             elasticClient.setStatisticTimestamp(trackTs);
+            elasticClient.refresh(ElasticsearchClient.INDEX_WORKSPACE);
+            elasticClient.cleanUpNodeStatistics(statistics);
         } catch (IOException e) {
             logger.error("problems reaching elastic search server");
         }

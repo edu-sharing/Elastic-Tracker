@@ -28,11 +28,17 @@ public class TrackerJob {
     public void track(){
         boolean aclChanges=aclTracker.track();
         boolean transactionChanges=transactionTracker.track();
+
         if(aclChanges || transactionChanges){
             logger.info("recursiv aclChanges:" + aclChanges +" transactionChanges:"+transactionChanges);
             track();
         }
     }
+
+    /**
+     * no race condition possibe with track() cause all scheduled tasks are executed by single thread
+     * https://stackoverflow.com/questions/24033208/how-to-prevent-overlapping-schedules-in-spring
+     */
     @Scheduled(fixedDelayString = "${statistic.delay}")
     public void trackStatistics(){
         statisticsTracker.track();
