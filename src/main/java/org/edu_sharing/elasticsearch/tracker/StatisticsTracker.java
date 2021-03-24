@@ -11,10 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Component
 public class StatisticsTracker {
@@ -37,7 +34,7 @@ public class StatisticsTracker {
     public void track(){
         try {
 
-            long trackTs = System.currentTimeMillis();
+            long trackTs = getTodayMidnight();
             long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
             StatisticTimestamp statisticTimestamp = elasticClient.getStatisticTimestamp();
             if(statisticTimestamp != null && statisticTimestamp.isAllInIndex()){
@@ -61,5 +58,15 @@ public class StatisticsTracker {
         } catch (IOException e) {
             logger.error("problems reaching elastic search server");
         }
+    }
+
+    private long getTodayMidnight(){
+        Calendar date = Calendar.getInstance();
+// reset hour, minutes, seconds and millis
+        date.set(Calendar.HOUR_OF_DAY, 0);
+        date.set(Calendar.MINUTE, 0);
+        date.set(Calendar.SECOND, 0);
+        date.set(Calendar.MILLISECOND, 0);
+        return date.getTime().getTime();
     }
 }
