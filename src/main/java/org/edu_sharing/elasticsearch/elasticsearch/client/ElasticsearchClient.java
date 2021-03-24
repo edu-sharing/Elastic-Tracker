@@ -1203,9 +1203,7 @@ public class ElasticsearchClient {
         for(Map.Entry<String,List<NodeStatistic>> entry : nodeStatistics.entrySet()){
             String uuid = entry.getKey();
             List<NodeStatistic> statistics = entry.getValue();
-            if(statistics.size() == 0){
-                return;
-            }
+            if(statistics == null || statistics.size() == 0) continue;
 
             String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
             Serializable value = this.getProperty(nodeRef,"dbid");
@@ -1224,8 +1222,6 @@ public class ElasticsearchClient {
             XContentBuilder builder = jsonBuilder();
             Map<String,Integer> dayCountsView = new HashMap<>();
             Map<String,Integer> dayCountsDownload = new HashMap<>();
-
-            if(statistics == null || statistics.size() == 0) continue;
 
             builder.startObject();
             for(NodeStatistic nodeStatistic : statistics){
