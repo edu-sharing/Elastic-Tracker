@@ -971,11 +971,12 @@ public class ElasticsearchClient {
         return aclChangeSet;
     }
 
-    public void setStatisticTimestamp(long statisticTimestamp) throws IOException {
+    public void setStatisticTimestamp(long statisticTimestamp, boolean allInIndex) throws IOException {
         XContentBuilder builder = jsonBuilder();
         builder.startObject();
         {
             builder.field("statisticTimestamp", statisticTimestamp);
+            builder.field("allInIndex",allInIndex);
         }
         builder.endObject();
         setNode(INDEX_TRANSACTIONS, ID_STATISTICS_TIMESTAMP, builder);
@@ -987,6 +988,8 @@ public class ElasticsearchClient {
         if(resp.isExists()){
             sTs = new StatisticTimestamp();
             sTs.setStatisticTimestamp(Long.parseLong(resp.getSource().get("statisticTimestamp").toString()));
+            Boolean allInIndex = (Boolean)resp.getSource().get("allInIndex");
+            sTs.setAllInIndex((allInIndex == null) ? false : allInIndex);
         }
         return sTs;
     }
@@ -1176,7 +1179,8 @@ public class ElasticsearchClient {
     }
 
     public Serializable getProperty(String nodeRef, String property) throws IOException {
-       return (Serializable)getSourceMap(nodeRef).get(property);
+       Map<String,Object> sourceMap = getSourceMap(nodeRef);
+       return (sourceMap == null) ? null: (Serializable)sourceMap.get(property);
     }
 
     public Map<String,Object> getSourceMap(String nodeRef) throws IOException {
@@ -1197,8 +1201,15 @@ public class ElasticsearchClient {
         return searchHit.getSourceAsMap();
     }
 
-    public void updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
+    /**
+     *
+     * @param nodeStatistics
+     * @return true when all uuids already exist in index
+     * @throws IOException
+     */
+    public boolean updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
 
+        boolean allInIndex = true;
         List<UpdateRequest> bulk = new ArrayList<>();
         for(Map.Entry<String,List<NodeStatistic>> entry : nodeStatistics.entrySet()){
             String uuid = entry.getKey();
@@ -1213,7 +1224,8 @@ public class ElasticsearchClient {
 
                 if(value == null){
                     logger.info("uuid:"+uuid+" is not in elastic in elastic index");
-                    return;
+                    allInIndex = false;
+                    continue;
                 }
             }
 
@@ -1283,18 +1295,21 @@ public class ElasticsearchClient {
         if(bulk.size() > 0){
             this.updateBulk(bulk);
         }
+        return allInIndex;
     }
 
 
     public void cleanUpNodeStatistics(List<String> nodeUuids) throws IOException {
+        logger.info("starting cleanUpNodeStatistics");
         for(String uuid : nodeUuids){
             cleanUpNodeStatistics(uuid);
         }
+        logger.info("returning cleanUpNodeStatistics");
     }
 
 
     public void cleanUpNodeStatistics(String nodeUuid) throws IOException {
-        logger.info("starting cleanUpNodeStatistics");
+
 
         Map<String, Object> sourceMap = getSourceMap("workspace://SpacesStore/" + nodeUuid);
         if(sourceMap == null){
@@ -1343,8 +1358,6 @@ public class ElasticsearchClient {
 
             this.update(request);
         }
-
-        logger.info("returning cleanUpNodeStatistics");
     }
 
 }
