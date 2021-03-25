@@ -25,6 +25,8 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class EduSharingClient {
@@ -359,8 +361,17 @@ public class EduSharingClient {
                 logger.error(message);
                 throw new RuntimeException(message);
             }
-
             jsessionId = response.getCookies().get("JSESSIONID");
+            // does not work for secure cookies
+            if(jsessionId == null) {
+                Pattern cookiePattern = Pattern.compile("JSESSIONID=(.*); Path");
+                Matcher m = cookiePattern.matcher(response.getHeaderString("Set-Cookie"));
+                if (!m.find()) {
+                    throw new RuntimeException("No cookie received from edu-sharing server " + alfrescoHost);
+                }
+                jsessionId = new NewCookie("JSESSIONID", m.group(1));
+            }
+
         }finally {
             educlient.property("http.autoredirect", true);
             educlient.property("http.redirect.relative.uri", true);
