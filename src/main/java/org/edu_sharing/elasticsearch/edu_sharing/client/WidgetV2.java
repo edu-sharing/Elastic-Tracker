@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class WidgetV2 {
 
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public static class Condition{
 		private String value,type;
 		private boolean negate;
@@ -33,6 +34,8 @@ public class WidgetV2 {
 		}
 
 	}
+	
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public static class Subwidget{
     			private String id;
 
