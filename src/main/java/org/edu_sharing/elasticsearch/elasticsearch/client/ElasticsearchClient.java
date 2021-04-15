@@ -468,6 +468,7 @@ public class ElasticsearchClient {
                 }
 
                 if("ccm:mediacenter".equals(key)){
+                    ArrayList<Map> mediacenters = null;
                     if(value != null && !value.toString().trim().equals("")){
                         JsonParser jp = new BasicJsonParser();
                         List<String> mzStatusList = (List<String>)value;
@@ -481,8 +482,20 @@ public class ElasticsearchClient {
                         }
                         if(result.size() > 0) {
                             value = result;
+                            mediacenters = result;
                         }
-                     }
+                    }
+
+                    if(mediacenters != null){
+                        builder.startObject("c ");
+                        for(Map mediacenter : mediacenters){
+                            builder.startObject((String)mediacenter.get("name"));
+                            builder.field("activated",mediacenter.get("activated"));
+                            builder.endObject();
+                        }
+                        builder.endObject();
+                    }
+
                 }
 
                 if(value != null) {
