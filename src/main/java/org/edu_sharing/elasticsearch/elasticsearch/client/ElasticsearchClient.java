@@ -56,6 +56,9 @@ import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.json.BasicJsonParser;
+import org.springframework.boot.json.JsonParseException;
+import org.springframework.boot.json.JsonParser;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -477,6 +480,37 @@ public class ElasticsearchClient {
                     if(value != null && value.toString().trim().equals("")){
                         value = null;
                     }
+                }
+
+                if("ccm:mediacenter".equals(key)){
+                    ArrayList<Map> mediacenters = null;
+                    if(value != null && !value.toString().trim().equals("")){
+                        JsonParser jp = new BasicJsonParser();
+                        List<String> mzStatusList = (List<String>)value;
+                        ArrayList<Map> result = new ArrayList<>();
+                        for(String mzStatus : mzStatusList){
+                            try {
+                                result.add(jp.parseMap(mzStatus));
+                            }catch (JsonParseException e){
+                                logger.error(e.getMessage());
+                            }
+                        }
+                        if(result.size() > 0) {
+                            value = result;
+                            mediacenters = result;
+                        }
+                    }
+
+                    if(mediacenters != null){
+                        builder.startObject("c ");
+                        for(Map mediacenter : mediacenters){
+                            builder.startObject((String)mediacenter.get("name"));
+                            builder.field("activated",mediacenter.get("activated"));
+                            builder.endObject();
+                        }
+                        builder.endObject();
+                    }
+
                 }
 
                 if(value != null) {
