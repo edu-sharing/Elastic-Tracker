@@ -2,6 +2,7 @@ package org.edu_sharing.elasticsearch.tracker;
 
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.edu_sharing.client.NodeStatistic;
 import org.edu_sharing.elasticsearch.elasticsearch.client.ElasticsearchClient;
 import org.edu_sharing.elasticsearch.elasticsearch.client.Tx;
 import org.edu_sharing.elasticsearch.tools.Constants;
@@ -53,6 +54,9 @@ public class TransactionTracker {
 
     Logger logger = LoggerFactory.getLogger(TransactionTracker.class);
     private ForkJoinPool threadPool;
+
+    @Value("${statistic.historyInDays}")
+    long historyInDays;
 
     @PostConstruct
     public void init()  throws IOException{
@@ -259,6 +263,21 @@ public class TransactionTracker {
                     .values();
             for(List<NodeData> p : partitioned){
                 elasticClient.index(p);
+            }
+            for(NodeData nodeDataStat : toIndex){
+                if(!"ccm:io".equals(nodeDataStat.getNodeMetadata().getType())
+                        || !Tools.getProtocol(nodeDataStat.getNodeMetadata().getNodeRef()).equals("workspace")){
+                    continue;
+                }
+                long trackTs = System.currentTimeMillis();
+                long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
+                String nodeId = Tools.getUUID(nodeDataStat.getNodeMetadata().getNodeRef());
+                List<NodeStatistic> statisticsForNode = eduSharingClient.getStatisticsForNode(nodeId, trackFromTime);
+                Map<String,List<NodeStatistic>> updateNodeStatistics = new HashMap<>();
+                updateNodeStatistics.put(nodeId,statisticsForNode);
+                elasticClient.updateNodeStatistics(updateNodeStatistics);
+                //we don't need cleanup cause former elasticClient.index(..) call removes all statistic data
+                //elasticClient.cleanUpNodeStatistics(nodeDataStat);
             }
 
             /**

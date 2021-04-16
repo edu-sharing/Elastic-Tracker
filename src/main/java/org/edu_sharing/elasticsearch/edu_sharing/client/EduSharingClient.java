@@ -17,6 +17,7 @@ import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.NewCookie;
@@ -82,6 +83,10 @@ public class EduSharingClient {
     String URL_ABOUT = "/edu-sharing/rest/_about";
 
     String URL_REPOSITORIES = "/edu-sharing/rest/network/v1/repositories";
+
+    String URL_STATISTICS_ALTERED = "/edu-sharing/rest/statistic/v1/statistics/nodes/altered";
+
+    String URL_STATISTICS_NODE = "/edu-sharing/rest/statistic/v1/statistics/nodes/node";
 
     String URL_VALIDATE_SESSION = "/edu-sharing/rest/authentication/v1/validateSession";
 
@@ -324,7 +329,7 @@ public class EduSharingClient {
     }
 
     public ValidateSessionResponse validateSession(){
-        logger.info("edu-sharing validateSession");
+        logger.debug("edu-sharing validateSession");
         String url = new String(URL_VALIDATE_SESSION);
         url = getUrl(url);
         return educlient.
@@ -407,6 +412,36 @@ public class EduSharingClient {
         return null;
     }
 
+    @EduSharingAuthentication.ManageAuthentication
+    public List<String> getStatisticsNodeIds(long timestamp){
+        String url = new String(URL_STATISTICS_ALTERED);
+        url = getUrl(url);
+
+        return educlient.target(url).
+                queryParam("dateFrom",timestamp).
+                request(MediaType.APPLICATION_JSON).
+                cookie(jsessionId.getName(),jsessionId.getValue()).
+                get().readEntity(List.class);
+    }
+
+
+    @EduSharingAuthentication.ManageAuthentication
+    public List<NodeStatistic> getStatisticsForNode(String nodeId, long timestamp){
+        String url = new String(URL_STATISTICS_NODE);
+        url = getUrl(url);
+
+        return educlient.target(url).
+                path(nodeId).
+                queryParam("dateFrom",timestamp).
+                request(MediaType.APPLICATION_JSON).
+                cookie(jsessionId.getName(),jsessionId.getValue()).
+                get().readEntity(new GenericType<List<NodeStatistic>>(){});
+    }
+
+
+
+
+
 
     /**
      * refreshes cache when necessary
@@ -462,4 +497,5 @@ public class EduSharingClient {
 
         propMap.put(property,entries);
     }
+
 }

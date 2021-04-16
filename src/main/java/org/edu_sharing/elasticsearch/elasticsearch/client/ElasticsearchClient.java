@@ -15,6 +15,7 @@ import org.apache.tomcat.util.buf.StringUtils;
 import org.edu_sharing.elasticsearch.alfresco.client.*;
 import org.edu_sharing.elasticsearch.alfresco.client.Node;
 import org.edu_sharing.elasticsearch.edu_sharing.client.EduSharingClient;
+import org.edu_sharing.elasticsearch.edu_sharing.client.NodeStatistic;
 import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.elasticsearch.action.DocWriteResponse;
@@ -63,10 +64,14 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -92,6 +97,9 @@ public class ElasticsearchClient {
     @Value("${elastic.connectionRequestTimeout}")
     int elasticConnectionRequestTimeout;
 
+    @Value("${statistic.historyInDays}")
+    int statisticHistoryInDays;
+
     Logger logger = LogManager.getLogger(ElasticsearchClient.class);
 
     public static String INDEX_WORKSPACE = "workspace";
@@ -103,6 +111,11 @@ public class ElasticsearchClient {
     final static String ID_TRANSACTION = "1";
 
     final static String ID_ACL_CHANGESET = "2";
+
+    final static String ID_STATISTICS_TIMESTAMP ="3";
+
+    SimpleDateFormat statisticDateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
 
     String homeRepoId;
 
@@ -160,7 +173,7 @@ public class ElasticsearchClient {
     }
 
     public void updateNodesWithAcl(final long aclId, final Map<String,List<String>> permissions) throws IOException {
-        logger.info("starting: {} ",aclId);
+        logger.debug("starting: {} ",aclId);
         UpdateByQueryRequest request = new UpdateByQueryRequest(INDEX_WORKSPACE);
         request.setQuery(QueryBuilders.termQuery("aclId", aclId));
         request.setConflicts("proceed");
@@ -172,7 +185,7 @@ public class ElasticsearchClient {
 
         request.setScript(script);
         BulkByScrollResponse bulkByScrollResponse = client.updateByQuery(request, RequestOptions.DEFAULT);
-        logger.info("updated: {}", bulkByScrollResponse.getUpdated());
+        logger.debug("updated: {}", bulkByScrollResponse.getUpdated());
         List<BulkItemResponse.Failure> bulkFailures = bulkByScrollResponse.getBulkFailures();
         for(BulkItemResponse.Failure failure : bulkFailures){
             logger.error(failure.getMessage(),failure.getCause());
@@ -222,6 +235,8 @@ public class ElasticsearchClient {
             }
         }
     }
+
+
 
     public void index(List<NodeData> nodes) throws IOException{
         logger.info("starting bulk index for {}",nodes.size());
@@ -575,6 +590,32 @@ public class ElasticsearchClient {
                     get(child,builder);
                 }
                 builder.endArray();
+
+                Map<Date,Double> ratings = new HashMap<>();
+                double ratingAll = 0;
+                for(NodeData child : nodeData.getChildren()){
+                    if("ccm:rating".equals(child.getNodeMetadata().getType())){
+                        Date modified = Date.from(Instant.parse((String) child.getNodeMetadata().getProperties().get(Constants.getValidGlobalName("cm:modified"))));
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTime(modified);
+                        cal.set(Calendar.HOUR_OF_DAY,0);
+                        cal.clear(Calendar.MINUTE);
+                        cal.clear(Calendar.SECOND);
+                        cal.clear(Calendar.MILLISECOND);
+                        Date date = cal.getTime();
+                        Double sum = ratings.get(date);
+                        Double rating = Double.parseDouble((String)child.getNodeMetadata().getProperties().get(Constants.getValidGlobalName("ccm:rating_value")));
+                        ratingAll+=rating;
+                        sum = (sum == null) ? rating : sum + rating;
+                        ratings.put(date,sum);
+                    }
+                }
+                for(Map.Entry<Date,Double> rating : ratings.entrySet()){
+                    builder.field("statistic_RATING_"+statisticDateFormatter.format(rating.getKey()),rating.getValue());
+                }
+                if("ccm:io".equals(nodeData.getNodeMetadata().getType())) {
+                    builder.field("statistic_RATING_null", ratingAll);
+                }
             }
         }
 
@@ -964,6 +1005,28 @@ public class ElasticsearchClient {
         return aclChangeSet;
     }
 
+    public void setStatisticTimestamp(long statisticTimestamp, boolean allInIndex) throws IOException {
+        XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        {
+            builder.field("statisticTimestamp", statisticTimestamp);
+            builder.field("allInIndex",allInIndex);
+        }
+        builder.endObject();
+        setNode(INDEX_TRANSACTIONS, ID_STATISTICS_TIMESTAMP, builder);
+    }
+
+    public StatisticTimestamp getStatisticTimestamp() throws IOException {
+        GetResponse resp = this.get(INDEX_TRANSACTIONS, ID_STATISTICS_TIMESTAMP);
+        StatisticTimestamp sTs = null;
+        if(resp.isExists()){
+            sTs = new StatisticTimestamp();
+            sTs.setStatisticTimestamp(Long.parseLong(resp.getSource().get("statisticTimestamp").toString()));
+            Boolean allInIndex = (Boolean)resp.getSource().get("allInIndex");
+            sTs.setAllInIndex((allInIndex == null) ? false : allInIndex);
+        }
+        return sTs;
+    }
 
     public void delete(List<Node> nodes) throws IOException {
         logger.info("starting size:"+nodes.size());
@@ -1150,6 +1213,11 @@ public class ElasticsearchClient {
     }
 
     public Serializable getProperty(String nodeRef, String property) throws IOException {
+       Map<String,Object> sourceMap = getSourceMap(nodeRef);
+       return (sourceMap == null) ? null: (Serializable)sourceMap.get(property);
+    }
+
+    public Map<String,Object> getSourceMap(String nodeRef) throws IOException {
         String uuid = Tools.getUUID(nodeRef);
         String protocol = Tools.getProtocol(nodeRef);
         String identifier = Tools.getIdentifier(nodeRef);
@@ -1164,7 +1232,166 @@ public class ElasticsearchClient {
         }
 
         SearchHit searchHit = sh.getHits()[0];
-        return (Serializable) searchHit.getSourceAsMap().get(property);
+        return searchHit.getSourceAsMap();
+    }
+
+    /**
+     *
+     * @param nodeStatistics
+     * @return true when all uuids already exist in index
+     * @throws IOException
+     */
+    public boolean updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
+
+        boolean allInIndex = true;
+        List<UpdateRequest> bulk = new ArrayList<>();
+        for(Map.Entry<String,List<NodeStatistic>> entry : nodeStatistics.entrySet()){
+            String uuid = entry.getKey();
+            List<NodeStatistic> statistics = entry.getValue();
+            if(statistics == null || statistics.size() == 0) continue;
+
+            String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
+            Serializable value = this.getProperty(nodeRef,"dbid");
+            if(value == null){
+                String nodeRefArchive = Constants.STORE_REF_ARCHIV+"/"+uuid;
+                value = this.getProperty(nodeRefArchive,"dbid");
+
+                if(value == null){
+                    logger.info("uuid:"+uuid+" is not in elastic in elastic index");
+                    allInIndex = false;
+                    continue;
+                }
+            }
+
+            Long dbid = ((Number)value).longValue();
+
+            XContentBuilder builder = jsonBuilder();
+            Map<String,Integer> dayCountsView = new HashMap<>();
+            Map<String,Integer> dayCountsDownload = new HashMap<>();
+
+            builder.startObject();
+            for(NodeStatistic nodeStatistic : statistics){
+                if(nodeStatistic == null){
+                    logger.error("there is a null value in statistics list:"+nodeRef);
+                    continue;
+                }
+                if(nodeStatistic.getCounts() == null || nodeStatistic.getCounts().size() == 0) continue;
+                String DOWNLOAD = "DOWNLOAD_MATERIAL";
+                String VIEW = "VIEW_MATERIAL";
+                String fieldNameDownload = "statistic_" +DOWNLOAD +"_"+ nodeStatistic.getTimestamp();
+                String fieldNameView = "statistic_" +VIEW +"_"+ nodeStatistic.getTimestamp();
+                Integer download = nodeStatistic.getCounts().get(DOWNLOAD);
+                Integer view = nodeStatistic.getCounts().get(VIEW);
+                if(download != null && download > 0){
+                    builder.field(fieldNameDownload,download);
+                }
+                if(view != null && view > 0){
+                    builder.field(fieldNameView,view);
+                }
+
+            }
+            /*
+            builder.startArray("statistics");
+            for(NodeStatistic nodeStatistic : statistics){
+                if(nodeStatistic == null){
+                    logger.error("there is a null value in statistics list:"+nodeRef);
+                    return;
+                }
+                builder.startObject();
+
+                builder.field("timestamp_string",nodeStatistic.getTimestamp() );
+                try {
+                    if(nodeStatistic.getTimestamp() != null){
+                        Date date = statisticDateFormatter.parse(nodeStatistic.getTimestamp());
+                        builder.field("timestamp",date.getTime());
+                    }
+
+                } catch (ParseException e) {
+                    logger.error(nodeStatistic.getTimestamp()+ " is no timestamp");
+                }
+                builder.startObject("counts");
+                for(Map.Entry<String,Integer> countsEntry : nodeStatistic.getCounts().entrySet()){
+                    builder.field(countsEntry.getKey(),countsEntry.getValue());
+                }
+                builder.endObject();
+                builder.endObject();
+            }
+            builder.endArray();*/
+            builder.endObject();
+
+            UpdateRequest request = new UpdateRequest(
+                    INDEX_WORKSPACE,
+                    Long.toString(dbid)).doc(builder);
+
+            bulk.add(request);
+        }
+
+        if(bulk.size() > 0){
+            this.updateBulk(bulk);
+        }
+        return allInIndex;
+    }
+
+
+    public void cleanUpNodeStatistics(List<String> nodeUuids) throws IOException {
+        logger.info("starting cleanUpNodeStatistics");
+        for(String uuid : nodeUuids){
+            cleanUpNodeStatistics(uuid);
+        }
+        logger.info("returning cleanUpNodeStatistics");
+    }
+
+
+    public void cleanUpNodeStatistics(String nodeUuid) throws IOException {
+
+
+        Map<String, Object> sourceMap = getSourceMap("workspace://SpacesStore/" + nodeUuid);
+        if(sourceMap == null){
+            return;
+        }
+
+        long dbid = ((Number)sourceMap.get("dbid")).longValue();
+        String id = new Long(dbid).toString();
+        String type = (String)sourceMap.get("type");
+
+        if("ccm:io".equals(type)){
+            List<String> propsToRemove = new ArrayList<>();
+
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR,-statisticHistoryInDays);
+            for(Map.Entry<String,Object> entry : sourceMap.entrySet()){
+                if(entry.getKey().startsWith("statistic_")
+                        && !entry.getKey().startsWith("statistic_RATING")){
+                    String prefixPattern = "statistic_[a-zA-Z_]*";
+                    String datePattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}";
+                    if(entry.getKey().matches(prefixPattern+datePattern)){
+                        String[] split = Pattern.compile(prefixPattern).split(entry.getKey());
+
+                        try {
+
+                            Date date = statisticDateFormatter.parse(split[1]);
+                            if(cal.getTime().getTime() > date.getTime()){
+                                propsToRemove.add(entry.getKey());
+                            }
+                        } catch (ParseException e) {
+                            logger.error("can not get date in: "+entry.getKey());
+                        }
+                    }
+                }
+            }
+            if(propsToRemove.size() == 0) return;
+            Map<String,Object> params = new HashMap<>();
+            params.put("propsToRemove",propsToRemove);
+            Script inline = new Script(ScriptType.INLINE,
+                    "painless",
+                    "for(String prop : params.propsToRemove){ctx._source.remove(prop)}",
+                     params);
+            UpdateRequest request = new UpdateRequest(INDEX_WORKSPACE,id);
+            request.script(inline);
+            logger.info("remove for "+id+": "+String.join(",",propsToRemove));
+
+            this.update(request);
+        }
     }
 
 }

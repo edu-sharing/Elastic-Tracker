@@ -35,7 +35,7 @@ public class EduSharingAuthentication {
     public void manageAuthentication(JoinPoint joinPoint) throws Throwable {
         Date d = new Date();
         if(lastTimeAuthChecked == 0 || (d.getTime() - lastTimeAuthChecked) > eduSharingSessionValidateDelay) {
-            logger.info("manageAuthentication for:" + joinPoint.getSignature().getName());
+            logger.debug("manageAuthentication for:" + joinPoint.getSignature().getName());
             eduSharingClient.manageAuthentication();
             lastTimeAuthChecked = d.getTime();
         }
