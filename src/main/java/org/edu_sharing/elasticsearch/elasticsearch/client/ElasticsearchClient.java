@@ -591,7 +591,8 @@ public class ElasticsearchClient {
                 }
                 builder.endArray();
 
-                Map<Date,Double> ratings = new HashMap<>();
+                Map<Date,List<Double>> ratingsAtDay = new HashMap<>();
+                Map<Date,Double> ratingsAtDayAverage = new HashMap<>();
                 double ratingAll = 0;
                 for(NodeData child : nodeData.getChildren()){
                     if("ccm:rating".equals(child.getNodeMetadata().getType())){
@@ -603,14 +604,23 @@ public class ElasticsearchClient {
                         cal.clear(Calendar.SECOND);
                         cal.clear(Calendar.MILLISECOND);
                         Date date = cal.getTime();
-                        Double sum = ratings.get(date);
                         Double rating = Double.parseDouble((String)child.getNodeMetadata().getProperties().get(Constants.getValidGlobalName("ccm:rating_value")));
-                        ratingAll+=rating;
-                        sum = (sum == null) ? rating : sum + rating;
-                        ratings.put(date,sum);
+                        List<Double> dayRatings = ratingsAtDay.get(date);
+                        if(dayRatings == null){
+                            dayRatings = new ArrayList<>();
+                            ratingsAtDay.put(date,dayRatings);
+                        }
+                        dayRatings.add(rating);
                     }
                 }
-                for(Map.Entry<Date,Double> rating : ratings.entrySet()){
+                //average at day
+                for(Map.Entry<Date,List<Double>> entry : ratingsAtDay.entrySet()){
+                    ratingsAtDayAverage.put(entry.getKey(),entry.getValue().stream().mapToDouble(x -> x).summaryStatistics().getAverage());
+                }
+                //average all
+                ratingAll = ratingsAtDayAverage.values().stream().mapToDouble(x -> x).summaryStatistics().getAverage();
+
+                for(Map.Entry<Date,Double> rating : ratingsAtDayAverage.entrySet()){
                     builder.field("statistic_RATING_"+statisticDateFormatter.format(rating.getKey()),rating.getValue());
                 }
                 if("ccm:io".equals(nodeData.getNodeMetadata().getType())) {
