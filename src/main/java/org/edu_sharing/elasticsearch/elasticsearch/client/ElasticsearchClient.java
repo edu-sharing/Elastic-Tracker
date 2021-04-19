@@ -502,7 +502,7 @@ public class ElasticsearchClient {
                     }
 
                     if(mediacenters != null){
-                        builder.startObject("c ");
+                        builder.startObject("ccm:mediacenter_sort");
                         for(Map mediacenter : mediacenters){
                             builder.startObject((String)mediacenter.get("name"));
                             builder.field("activated",mediacenter.get("activated"));
