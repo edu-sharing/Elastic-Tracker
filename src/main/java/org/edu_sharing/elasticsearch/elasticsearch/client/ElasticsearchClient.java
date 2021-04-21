@@ -1135,6 +1135,22 @@ public class ElasticsearchClient {
                                     .endObject()
                                 .endObject()
                             .endObject()
+                            .startObject()
+                                .startObject("statistics_rating")
+                                    .field("path_match", "statistic_RATING_*")
+                                    .startObject("mapping")
+                                        .field("type", "float")
+                                    .endObject()
+                                .endObject()
+                            .endObject()
+                            .startObject()
+                                .startObject("statistics_generic")
+                                    .field("path_match", "statistic_*")
+                                    .startObject("mapping")
+                                        .field("type", "long")
+                                    .endObject()
+                                .endObject()
+                            .endObject()
                         .endArray();
                 builder.startObject("properties");
                 {
