@@ -1282,7 +1282,7 @@ public class ElasticsearchClient {
             builder.startObject();
             for(NodeStatistic nodeStatistic : statistics){
                 if(nodeStatistic == null){
-                    logger.error("there is a null value in statistics list:"+nodeRef);
+                    logger.debug("there is a null value in statistics list:"+nodeRef);
                     continue;
                 }
                 if(nodeStatistic.getCounts() == null || nodeStatistic.getCounts().size() == 0) continue;
