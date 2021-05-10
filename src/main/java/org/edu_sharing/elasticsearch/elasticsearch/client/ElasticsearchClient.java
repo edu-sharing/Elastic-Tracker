@@ -1190,6 +1190,13 @@ public class ElasticsearchClient {
                                 //the others are default
                             .endObject()
                     .endObject();
+                    builder.startObject("children")
+                            .field("type", "object")
+                            .startObject("properties")
+                                .startObject("type").field("type", "keyword").endObject()
+                                .startObject("aspects").field("type", "keyword").endObject()
+                            .endObject()
+                    .endObject();
                     builder.startObject("aspects").field("type","keyword").endObject();
                     builder.startObject("collections")
 

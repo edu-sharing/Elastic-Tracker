@@ -158,20 +158,34 @@ public class AlfrescoWebscriptClient {
             String fullText = getTextContent(nodeData.getNodeMetadata().getId());
             if(fullText != null) nodeData.setFullText(fullText);
 
-            if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
-                List<Node> children = new ArrayList<>();
-                if(nodeData.getNodeMetadata().getChildIds() != null) {
-                    for (Long dbid : nodeData.getNodeMetadata().getChildIds()) {
-                        Node childNode = new Node();
-                        childNode.setId(dbid);
-                        children.add(childNode);
-                    }
 
-                    if (children.size() > 0) {
-                        nodeData.getChildren().addAll(getNodeData(this.getNodeMetadata(children)));
+            List<String> allowedChildTypes = new ArrayList<>();
+            if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
+                // io/file -> we allow everything
+                allowedChildTypes.add("ALL");
+            } else if ("ccm:map".equals(nodeData.getNodeMetadata().getType())){
+                // map/folder -> we only allow specific elements relvant for maps
+                allowedChildTypes.add("ccm:collection_proposal");
+            }
+
+            List<Node> children = new ArrayList<>();
+            if(nodeData.getNodeMetadata().getChildIds() != null) {
+                for (Long dbid : nodeData.getNodeMetadata().getChildIds()) {
+                    Node childNode = new Node();
+                    childNode.setId(dbid);
+                    children.add(childNode);
+                }
+
+                if (children.size() > 0) {
+                    List<NodeData> childrenFiltered = getNodeData(this.getNodeMetadata(children)).stream().filter((node) ->
+                        allowedChildTypes.contains("ALL") || allowedChildTypes.contains(node.getNodeMetadata().getType())
+                    ).collect(Collectors.toList());
+                    if(childrenFiltered.size() > 0) {
+                        nodeData.getChildren().addAll(childrenFiltered);
                     }
                 }
             }
+
         }
 
         return result;

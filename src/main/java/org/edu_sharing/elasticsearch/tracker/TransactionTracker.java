@@ -39,7 +39,7 @@ public class TransactionTracker {
     @Value("${allowed.types}")
     String allowedTypes;
 
-    List<String> subTypes = Arrays.asList(new String[]{"ccm:io","ccm:rating","ccm:comment","ccm:usage"});
+    List<String> subTypes = Arrays.asList(new String[]{"ccm:io","ccm:rating","ccm:comment","ccm:usage","ccm:collection_proposal"});
 
     @Value("${index.storerefs}")
     List<String> indexStoreRefs;
