@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.ResponseProcessingException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.*;
@@ -100,8 +101,14 @@ public class AlfrescoWebscriptClient {
             logger.error("problems with node(s):" + valueAsString);
             return null;
         }else{
-            NodeMetadatas nmds = resp.readEntity(NodeMetadatas.class);
-            return nmds;
+            try {
+                NodeMetadatas nmds = resp.readEntity(NodeMetadatas.class);
+                return nmds;
+            }catch(ResponseProcessingException e){
+                String valueAsString = resp.readEntity(String.class);
+                logger.error("problems with node(s):" + valueAsString,e);
+                return null;
+            }
         }
     }
     public List<NodeMetadata> getNodeMetadata(List<Node> nodes){
@@ -115,7 +122,9 @@ public class AlfrescoWebscriptClient {
         getNodeMetadataParam.setNodeIds(dbnodeids);
 
         NodeMetadatas nmds = getNodeMetadata(getNodeMetadataParam);
-        return nmds.getNodes();
+        if(nmds != null) {
+            return nmds.getNodes();
+        }else return new ArrayList<>();
 
     }
     public List<NodeData> getNodeData(List<NodeMetadata> nodes){
