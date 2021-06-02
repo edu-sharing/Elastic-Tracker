@@ -105,6 +105,9 @@ public class AlfrescoWebscriptClient {
                 NodeMetadatas nmds = resp.readEntity(NodeMetadatas.class);
                 return nmds;
             }catch(ResponseProcessingException e){
+                resp = client.target(url)
+                        .request(MediaType.APPLICATION_JSON)
+                        .post(Entity.json(param));
                 String valueAsString = resp.readEntity(String.class);
                 logger.error("problems with node(s):" + valueAsString,e);
                 return null;
