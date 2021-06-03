@@ -163,7 +163,8 @@ public class AlfrescoWebscriptClient {
             if("ccm:io".equals(nodeData.getNodeMetadata().getType())){
                 // io/file -> we allow everything
                 allowedChildTypes.add("ALL");
-            } else if ("ccm:map".equals(nodeData.getNodeMetadata().getType())){
+            } else if ("ccm:map".equals(nodeData.getNodeMetadata().getType())
+                    && nodeData.getNodeMetadata().getAspects().contains("ccm:collection")){
                 // map/folder -> we only allow specific elements relvant for maps
                 allowedChildTypes.add("ccm:collection_proposal");
             }
@@ -176,7 +177,7 @@ public class AlfrescoWebscriptClient {
                     children.add(childNode);
                 }
 
-                if (children.size() > 0) {
+                if (children.size() > 0 && allowedChildTypes.size() > 0) {
                     List<NodeData> childrenFiltered = getNodeData(this.getNodeMetadata(children)).stream().filter((node) ->
                         allowedChildTypes.contains("ALL") || allowedChildTypes.contains(node.getNodeMetadata().getType())
                     ).collect(Collectors.toList());
