@@ -106,8 +106,8 @@ public class EduSharingClient {
         if (Boolean.parseBoolean(logRequests)) {
             educlient.register(new LoggingFeature());
         }
-        educlient.property("use.async.http.conduit", Boolean.TRUE);
-        educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+        //educlient.property("use.async.http.conduit", Boolean.TRUE);
+        //educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
         // relevant for external previews or static previews (e.g. svg)
         educlient.property("http.autoredirect", true);
         educlient.property("http.redirect.relative.uri", true);
