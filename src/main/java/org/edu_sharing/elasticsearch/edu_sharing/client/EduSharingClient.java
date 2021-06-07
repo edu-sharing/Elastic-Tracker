@@ -9,6 +9,7 @@ import org.edu_sharing.elasticsearch.tools.Constants;
 import org.edu_sharing.elasticsearch.tools.Tools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -96,18 +97,22 @@ public class EduSharingClient {
 
     HashMap<String,HashMap<String, HashMap<String,ValuespaceEntries>>> cache = new HashMap<>();
 
+    @Autowired
+    EduSharingAuthentication.EduSharingAuthenticationResponseFilter eduSharingAuthenticationResponseFilter;
+
     @PostConstruct
     public void init()  throws IOException {
         authorizationHeader = "Basic "
                 + org.apache.cxf.common.util.Base64Utility.encode(String.format("%s:%s",alfrescoUsername,alfrescoPassword).getBytes());
         educlient = ClientBuilder.newBuilder()
                 .register(JacksonJsonProvider.class)
-                .register(PreviewDataReader.class).build();
+                .register(PreviewDataReader.class)
+                .build();
         if (Boolean.parseBoolean(logRequests)) {
             educlient.register(new LoggingFeature());
         }
-        educlient.property("use.async.http.conduit", Boolean.TRUE);
-        educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
+        //educlient.property("use.async.http.conduit", Boolean.TRUE);
+        //educlient.property("org.apache.cxf.transport.http.async.usePolicy", AsyncHTTPConduitFactory.UseAsyncPolicy.ALWAYS);
         // relevant for external previews or static previews (e.g. svg)
         educlient.property("http.autoredirect", true);
         educlient.property("http.redirect.relative.uri", true);

@@ -69,6 +69,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
@@ -1108,6 +1109,8 @@ public class ElasticsearchClient {
                 // dynamic copy to fields for facettes across collection refs
                 builder
                         .field("dynamic", true)
+                        // auto detect string based numbers and convert them
+                        .field("numeric_detection", true)
                         .startArray("dynamic_templates")
                             .startObject()
                                 .startObject("aggregated_type")
@@ -1116,6 +1119,20 @@ public class ElasticsearchClient {
                                     .startObject("mapping")
                                         .field("type", "keyword")
                                         .field("store", true)
+                                    .endObject()
+                                .endObject()
+                            .endObject()
+                            .startObject()
+                                .startObject("convert_numeric")
+                                    .field("match_mapping_type","long")
+                                    .field("path_match","*properties.*")
+                                    .startObject("mapping")
+                                        .field("type", "text")
+                                        .field("store", true)
+                                        .startObject("fields")
+                                            .startObject("keyword").field("type", "keyword").field("ignore_above", 256).endObject()
+                                            .startObject("number").field("type", "long").endObject()
+                                        .endObject()
                                     .endObject()
                                 .endObject()
                             .endObject()
@@ -1276,93 +1293,82 @@ public class ElasticsearchClient {
      */
     public boolean updateNodeStatistics(Map<String,List<NodeStatistic>> nodeStatistics) throws IOException{
 
-        boolean allInIndex = true;
-        List<UpdateRequest> bulk = new ArrayList<>();
-        for(Map.Entry<String,List<NodeStatistic>> entry : nodeStatistics.entrySet()){
-            String uuid = entry.getKey();
-            List<NodeStatistic> statistics = entry.getValue();
-            if(statistics == null || statistics.size() == 0) continue;
+        AtomicBoolean allInIndex = new AtomicBoolean();
+        allInIndex.set(true);
+        //boolean allInIndex = true;
 
-            String nodeRef = Constants.STORE_REF_WORKSPACE+"/"+uuid;
-            Serializable value = this.getProperty(nodeRef,"dbid");
-            if(value == null){
-                String nodeRefArchive = Constants.STORE_REF_ARCHIV+"/"+uuid;
-                value = this.getProperty(nodeRefArchive,"dbid");
+        AtomicInteger counter = new AtomicInteger();
+        int chunkSize = 500;
+        try {
+            nodeStatistics.entrySet().stream().collect(Collectors.groupingBy(e -> counter.getAndIncrement() / chunkSize)).values().forEach(m -> {
 
-                if(value == null){
-                    logger.info("uuid:"+uuid+" is not in elastic in elastic index");
-                    allInIndex = false;
-                    continue;
-                }
-            }
-
-            Long dbid = ((Number)value).longValue();
-
-            XContentBuilder builder = jsonBuilder();
-            Map<String,Integer> dayCountsView = new HashMap<>();
-            Map<String,Integer> dayCountsDownload = new HashMap<>();
-
-            builder.startObject();
-            for(NodeStatistic nodeStatistic : statistics){
-                if(nodeStatistic == null){
-                    logger.debug("there is a null value in statistics list:"+nodeRef);
-                    continue;
-                }
-                if(nodeStatistic.getCounts() == null || nodeStatistic.getCounts().size() == 0) continue;
-                String DOWNLOAD = "DOWNLOAD_MATERIAL";
-                String VIEW = "VIEW_MATERIAL";
-                String fieldNameDownload = "statistic_" +DOWNLOAD +"_"+ nodeStatistic.getTimestamp();
-                String fieldNameView = "statistic_" +VIEW +"_"+ nodeStatistic.getTimestamp();
-                Integer download = nodeStatistic.getCounts().get(DOWNLOAD);
-                Integer view = nodeStatistic.getCounts().get(VIEW);
-                if(download != null && download > 0){
-                    builder.field(fieldNameDownload,download);
-                }
-                if(view != null && view > 0){
-                    builder.field(fieldNameView,view);
-                }
-
-            }
-            /*
-            builder.startArray("statistics");
-            for(NodeStatistic nodeStatistic : statistics){
-                if(nodeStatistic == null){
-                    logger.error("there is a null value in statistics list:"+nodeRef);
-                    return;
-                }
-                builder.startObject();
-
-                builder.field("timestamp_string",nodeStatistic.getTimestamp() );
+                logger.info("starting with page:"+ (counter.get() / chunkSize) +" collection size:"+m.size());
                 try {
-                    if(nodeStatistic.getTimestamp() != null){
-                        Date date = statisticDateFormatter.parse(nodeStatistic.getTimestamp());
-                        builder.field("timestamp",date.getTime());
+                    List<UpdateRequest> bulk = new ArrayList<>();
+                    for (Map.Entry<String, List<NodeStatistic>> entry : m) {
+                        String uuid = entry.getKey();
+                        List<NodeStatistic> statistics = entry.getValue();
+                        if (statistics == null || statistics.size() == 0) continue;
+
+                        String nodeRef = Constants.STORE_REF_WORKSPACE + "/" + uuid;
+                        Serializable value = this.getProperty(nodeRef, "dbid");
+                        if (value == null) {
+                            String nodeRefArchive = Constants.STORE_REF_ARCHIV + "/" + uuid;
+                            value = this.getProperty(nodeRefArchive, "dbid");
+
+                            if (value == null) {
+                                logger.info("uuid:" + uuid + " is not in elastic in elastic index");
+                                allInIndex.set(false);
+                                continue;
+                            }
+                        }
+
+                        Long dbid = ((Number) value).longValue();
+
+                        XContentBuilder builder = jsonBuilder();
+                        Map<String, Integer> dayCountsView = new HashMap<>();
+                        Map<String, Integer> dayCountsDownload = new HashMap<>();
+
+                        builder.startObject();
+                        for (NodeStatistic nodeStatistic : statistics) {
+                            if (nodeStatistic == null) {
+                                logger.debug("there is a null value in statistics list:" + nodeRef);
+                                continue;
+                            }
+                            if (nodeStatistic.getCounts() == null || nodeStatistic.getCounts().size() == 0) continue;
+                            String DOWNLOAD = "DOWNLOAD_MATERIAL";
+                            String VIEW = "VIEW_MATERIAL";
+                            String fieldNameDownload = "statistic_" + DOWNLOAD + "_" + nodeStatistic.getTimestamp();
+                            String fieldNameView = "statistic_" + VIEW + "_" + nodeStatistic.getTimestamp();
+                            Integer download = nodeStatistic.getCounts().get(DOWNLOAD);
+                            Integer view = nodeStatistic.getCounts().get(VIEW);
+                            if (download != null && download > 0) {
+                                builder.field(fieldNameDownload, download);
+                            }
+                            if (view != null && view > 0) {
+                                builder.field(fieldNameView, view);
+                            }
+
+                        }
+
+                        builder.endObject();
+
+                        UpdateRequest request = new UpdateRequest(
+                                INDEX_WORKSPACE,
+                                Long.toString(dbid)).doc(builder);
+
+                        bulk.add(request);
                     }
 
-                } catch (ParseException e) {
-                    logger.error(nodeStatistic.getTimestamp()+ " is no timestamp");
+                    if (bulk.size() > 0) {
+                        this.updateBulk(bulk);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-                builder.startObject("counts");
-                for(Map.Entry<String,Integer> countsEntry : nodeStatistic.getCounts().entrySet()){
-                    builder.field(countsEntry.getKey(),countsEntry.getValue());
-                }
-                builder.endObject();
-                builder.endObject();
-            }
-            builder.endArray();*/
-            builder.endObject();
-
-            UpdateRequest request = new UpdateRequest(
-                    INDEX_WORKSPACE,
-                    Long.toString(dbid)).doc(builder);
-
-            bulk.add(request);
-        }
-
-        if(bulk.size() > 0){
-            this.updateBulk(bulk);
-        }
-        return allInIndex;
+            });
+        }catch (RuntimeException e){throw (IOException)e.getCause();};
+        return allInIndex.get();
     }
 
 
