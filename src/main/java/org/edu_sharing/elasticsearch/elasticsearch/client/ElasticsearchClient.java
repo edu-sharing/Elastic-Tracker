@@ -1291,14 +1291,15 @@ public class ElasticsearchClient {
         //boolean allInIndex = true;
 
         AtomicInteger counter = new AtomicInteger();
-        int chunkSize = 500;
-        try {
-            nodeStatistics.entrySet().stream().collect(Collectors.groupingBy(e -> counter.getAndIncrement() / chunkSize)).values().forEach(m -> {
+        int chunkSize = 100;
 
-                logger.info("starting with page:"+ (counter.get() / chunkSize) +" collection size:"+m.size());
+        try {
+            nodeStatistics.entrySet().stream().collect(Collectors.groupingBy(e -> counter.getAndIncrement() / chunkSize)).entrySet().forEach(m -> {
+
+                logger.info("starting with page:"+ m.getKey()  +" collection size:"+m.getValue().size());
                 try {
                     List<UpdateRequest> bulk = new ArrayList<>();
-                    for (Map.Entry<String, List<NodeStatistic>> entry : m) {
+                    for (Map.Entry<String, List<NodeStatistic>> entry : m.getValue()) {
                         String uuid = entry.getKey();
                         List<NodeStatistic> statistics = entry.getValue();
                         if (statistics == null || statistics.size() == 0) continue;
