@@ -41,11 +41,12 @@ public class StatisticsTracker {
         try {
 
             if(currentChunks.size() == 0) {
+                allNodesInIndex = true;
 
                 trackTs = getTodayMidnight();
                 long trackFromTime = trackTs - (historyInDays * 24L * 60L * 60L * 1000L);
                 StatisticTimestamp statisticTimestamp = elasticClient.getStatisticTimestamp();
-                if (statisticTimestamp != null && statisticTimestamp.isAllInIndex()) {
+                if (statisticTimestamp != null) {
                     trackFromTime = statisticTimestamp.getStatisticTimestamp();
                     logger.info("starting from last run " + new Date(trackFromTime));
                 } else {
