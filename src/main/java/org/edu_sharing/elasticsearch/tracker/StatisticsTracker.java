@@ -35,6 +35,7 @@ public class StatisticsTracker {
     Map<Integer, List<Map.Entry<String, List<NodeStatistic>>>> currentChunks  = new HashMap<>();
     int chunkSize = 1000;
     long trackTs = -1;
+    long trackTsTo = -1;
     boolean allNodesInIndex = true;
 
     public void track(){
@@ -53,6 +54,7 @@ public class StatisticsTracker {
                     logger.info("starting from history " + new Date(trackFromTime));
                 }
 
+                trackTsTo = System.currentTimeMillis();
                 Map<String, List<NodeStatistic>> nodeStatistics = new HashMap<>();
                 List<String> statistics = eduSharingClient.getStatisticsNodeIds(trackFromTime);
                 logger.info("found " + statistics.size() + " statistic changes");
@@ -86,8 +88,8 @@ public class StatisticsTracker {
             successfullChunks.stream().forEach(c -> currentChunks.remove(c));
 
             if(currentChunks.size() == 0) {
-                logger.info("finished statistics until:" + new Date(trackTs));
-                elasticClient.setStatisticTimestamp(trackTs, allNodesInIndex);
+                logger.info("finished statistics until:" + new Date(trackTsTo));
+                elasticClient.setStatisticTimestamp(trackTsTo, allNodesInIndex);
             }
             elasticClient.refresh(ElasticsearchClient.INDEX_WORKSPACE);
 
