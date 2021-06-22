@@ -1,15 +1,6 @@
 image: maven:latest
 
-services:
-  - name: docker:dind
-    entrypoint: [ "env", "-u", "DOCKER_HOST" ]
-    command: [ "dockerd-entrypoint.sh" ]
-
 variables:
-  DOCKER_BUILD: "true"
-  DOCKER_DRIVER: overlay2
-  DOCKER_HOST: tcp://docker:2375/
-  DOCKER_TLS_CERTDIR: ""
   MAVEN_CLI_OPTS: "-s .mvn/settings.xml --batch-mode --errors --show-version"
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
 

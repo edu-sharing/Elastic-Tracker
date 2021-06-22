@@ -7,13 +7,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>2.3.8.RELEASE</version>
-    <relativePath/> <!-- lookup parent from repository -->
+    <groupId>org.edu_sharing</groupId>
+    <artifactId>edu_sharing-super-pom</artifactId>
+    <version>develop-SNAPSHOT</version>
+    <relativePath/>
   </parent>
 
-  <groupId>org.edu_sharing</groupId>
   <artifactId>edu_sharing-community-repository-backend-search-elastic-tracker</artifactId>
   <version>git</version>
 
@@ -45,16 +44,36 @@
   </scm>
 
   <properties>
-    <deps.elasticsearch.version>7.8.0</deps.elasticsearch.version>
-    <deps.jersey.version>2.29.1</deps.jersey.version>
-    <java.version>1.8</java.version>
-	<cxf.version>3.4.2</cxf.version>
-    <jackson.version>2.12.1</jackson.version>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <spring.boot.version>2.5.1</spring.boot.version>
   </properties>
 
+  <dependencyManagement>
+
+    <dependencies>
+
+      <dependency>
+        <groupId>org.apache.cxf</groupId>
+        <artifactId>cxf-bom</artifactId>
+        <version>3.4.4</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
+
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+    </dependencies>
+
+  </dependencyManagement>
+
   <dependencies>
-
-
 
     <dependency>
       <groupId>net.sourceforge.cardme</groupId>
@@ -63,77 +82,90 @@
     </dependency>
 
     <dependency>
-      <groupId>org.elasticsearch</groupId>
-      <artifactId>elasticsearch</artifactId>
-      <version>${deps.elasticsearch.version}</version>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-rs-client</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>org.elasticsearch.client</groupId>
-      <artifactId>elasticsearch-rest-client</artifactId>
-      <version>${deps.elasticsearch.version}</version>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-rs-extension-providers</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-transports-http-hc</artifactId>
+    </dependency>
+
+    <!--
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>edu_sharing-community-repository-backend-alfresco-module</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>edu_sharing-community-repository-backend-services-core</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    -->
 
     <dependency>
       <groupId>org.elasticsearch.client</groupId>
       <artifactId>elasticsearch-rest-high-level-client</artifactId>
-      <version>${deps.elasticsearch.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.jaxrs</groupId>
+      <artifactId>jackson-jaxrs-json-provider</artifactId>
     </dependency>
 
     <dependency>
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-core</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-databind</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <dependency>
-	  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-	  <artifactId>jackson-jaxrs-json-provider</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-annotations</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-rs-client</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-rs-extension-providers</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-transports-http-hc</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter</artifactId>
-	</dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -146,106 +178,53 @@
         </exclusion>
       </exclusions>
     </dependency>
-      <dependency>
-          <groupId>org.springframework</groupId>
-          <artifactId>spring-aop</artifactId>
-          <version>5.2.6.RELEASE</version>
-      </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-aop</artifactId>
-    </dependency>
 
   </dependencies>
 
   <build>
+
     <plugins>
+
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>validate</phase>
+            <configuration>
+              <rules>
+                <requireReleaseDeps>
+                  <message>No Snapshots Allowed!</message>
+                  <onlyWhenRelease>true</onlyWhenRelease>
+                </requireReleaseDeps>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
     </plugins>
+
   </build>
 
-  <profiles>
-
-    <profile>
-
-      <id>docker</id>
-
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property>
-          <name>env.DOCKER_BUILD</name>
-          <value>true</value>
-        </property>
-      </activation>
-
-      <properties>
-
-        <docker.image>edusharing-repository-search-elastic-tracker</docker.image>
-        <docker.tag>${project.version}</docker.tag>
-        <docker.registry>community.docker.edu-sharing.com</docker.registry>
-        <docker.verbose>true</docker.verbose>
-
-      </properties>
-
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <version>0.34.1</version>
-            <configuration>
-              <images>
-                <image>
-                  <registry>${docker.registry}</registry>
-                  <name>${docker.image}:${docker.tag}</name>
-                  <build>
-                    <from>gcr.io/distroless/java:11</from>
-                    <assembly>
-                      <descriptorRef>artifact</descriptorRef>
-                    </assembly>
-                    <cmd>
-                      <arg>/maven/${project.artifactId}-${project.version}.jar</arg>
-                    </cmd>
-                  </build>
-                </image>
-              </images>
-            </configuration>
-            <executions>
-              <execution>
-                <id>build</id>
-                <goals>
-                  <goal>build</goal>
-                </goals>
-                <phase>install</phase>
-              </execution>
-              <execution>
-                <id>push</id>
-                <goals>
-                  <goal>push</goal>
-                </goals>
-                <phase>deploy</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
-
   <repositories>
-
-    <repository>
-      <id>central</id>
-      <name>Central Repository</name>
-      <url>https://repo1.maven.apache.org/maven2</url>
-      <layout>default</layout>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
 
     <repository>
       <id>edu-sharing.public.releases</id>
