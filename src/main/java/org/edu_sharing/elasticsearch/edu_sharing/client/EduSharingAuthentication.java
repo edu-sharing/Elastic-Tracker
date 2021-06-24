@@ -11,10 +11,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.ws.rs.client.ClientRequestContext;
+import javax.ws.rs.client.ClientResponseContext;
+import javax.ws.rs.client.ClientResponseFilter;
+import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.net.HttpURLConnection;
 import java.util.Date;
 
 @Aspect
@@ -46,6 +51,22 @@ public class EduSharingAuthentication {
     @Retention(RetentionPolicy.RUNTIME)
     public @interface ManageAuthentication {
 
+    }
+
+    @Component
+    public class EduSharingAuthenticationResponseFilter implements ClientResponseFilter{
+
+        @Autowired
+        EduSharingAuthentication auth;
+
+        @Override
+        public void filter(ClientRequestContext requestContext, ClientResponseContext responseContext) throws IOException {
+            if(responseContext.getStatus() == HttpURLConnection.HTTP_UNAUTHORIZED){
+                //force reauth
+                logger.info("got "+responseContext.getStatus() +" force authentication");
+                auth.lastTimeAuthChecked = 0;
+            }
+        }
     }
 
 }
