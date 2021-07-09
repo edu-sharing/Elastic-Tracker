@@ -5,10 +5,6 @@ import net.sourceforge.cardme.engine.VCardEngine;
 import net.sourceforge.cardme.vcard.VCard;
 import net.sourceforge.cardme.vcard.exceptions.VCardParseException;
 import net.sourceforge.cardme.vcard.types.ExtendedType;
-import org.apache.http.HttpHost;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.apache.http.impl.nio.reactor.IOReactorConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tomcat.util.buf.StringUtils;
@@ -26,7 +22,6 @@ import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
-import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -43,10 +38,8 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.mapper.MapperParsingException;
-import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.index.reindex.BulkByScrollResponse;
 import org.elasticsearch.index.reindex.UpdateByQueryRequest;
 import org.elasticsearch.script.Script;
@@ -67,7 +60,6 @@ import java.io.Serializable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -264,7 +256,7 @@ public class ElasticsearchClient {
                     logger.debug("updated node in elastic:" + node);
                     if(node.getType().equals("ccm:map") && node.getAspects().contains("ccm:collection")){
                         this.refresh(INDEX_WORKSPACE);
-                        onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
+                        onUpdateRefreshUsageCollectionReplicas(nodeData.getNodeMetadata());
                     }
                 }
                 ReplicationResponse.ShardInfo shardInfo = indexResponse.getShardInfo();
@@ -321,7 +313,7 @@ public class ElasticsearchClient {
                     Long dbId = Long.parseLong(item.getResponse().getId());
                     NodeData nodeData = collectionNodes.get(dbId);
                     if (nodeData != null) {
-                        onUpdateRefreshCollectionReplicas(nodeData.getNodeMetadata());
+                        onUpdateRefreshUsageCollectionReplicas(nodeData.getNodeMetadata());
                     }
                 }
                 logger.info("finished RefreshCollectionReplicas");
@@ -349,6 +341,18 @@ public class ElasticsearchClient {
             builder.field("aclId",  node.getAclId());
             builder.field("txnId",node.getTxnId());
             builder.field("dbid",node.getId());
+
+            List<String> parentUuids = Arrays.asList(node.getPaths().get(0).getApath().split("/"));
+            String parentUuid = parentUuids.stream().skip(parentUuids.size() -1).findFirst().get();
+            //getAncestors() is not sorted
+            String primaryParentRef = node.getAncestors().stream().filter(s -> s.contains(parentUuid)).findAny().get();
+            builder.startObject("parentRef")
+                    .startObject("storeRef")
+                        .field("protocol",Tools.getProtocol(primaryParentRef))
+                        .field("identifier",Tools.getIdentifier(primaryParentRef))
+                    .endObject()
+                    .field("id",Tools.getUUID(primaryParentRef))
+            .endObject();
 
             String id = node.getNodeRef().split("://")[1].split("/")[1];
             builder.startObject("nodeRef")
@@ -871,7 +875,7 @@ public class ElasticsearchClient {
         this.updateBulk(updateRequests);
     }
 
-    private void onUpdateRefreshCollectionReplicas(NodeMetadata node) throws IOException {
+    private void onUpdateRefreshUsageCollectionReplicas(NodeMetadata node) throws IOException {
 
         String query = null;
         if("ccm:map".equals(node.getType())){
@@ -1175,6 +1179,17 @@ public class ElasticsearchClient {
                     builder.startObject("aclId").field("type", "long").endObject();
                     builder.startObject("txnId").field("type", "long").endObject();
                     builder.startObject("dbid").field("type", "long").endObject();
+                    builder.startObject("parentRef")
+                            .startObject("properties")
+                                .startObject("storeRef")
+                                    .startObject("properties")
+                                        .startObject("protocol").field("type","keyword").endObject()
+                                        .startObject("identifier").field("type","keyword").endObject()
+                                    .endObject()
+                                .endObject()
+                                .startObject("id").field("type","keyword").endObject()
+                            .endObject()
+                    .endObject();
                     builder.startObject("nodeRef")
                             .startObject("properties")
                                 .startObject("storeRef")
