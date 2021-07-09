@@ -780,6 +780,19 @@ public class ElasticsearchClient {
                 }
             }
 
+            /**
+             * try it is an proposal proposaldbid
+             */
+            QueryBuilder queryProposal = QueryBuilders.termQuery("collections.proposaldbid",node.getId());
+            if(collectionCheckAttribute == null) {
+                searchHitsIO = this.search(INDEX_WORKSPACE,queryProposal,0,1);
+                if(searchHitsIO.getTotalHits().value > 0){
+                    collectionCheckAttribute = "proposaldbid";
+                    collectionCheckQuery = queryProposal;
+                }
+            }
+
+
             //nothing to cleanup
             if(collectionCheckAttribute == null){
                 continue;
