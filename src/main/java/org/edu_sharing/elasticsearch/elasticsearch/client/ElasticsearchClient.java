@@ -651,21 +651,37 @@ public class ElasticsearchClient {
         logger.debug("returning");
     }
 
-    public void indexCollections(NodeMetadata usage) throws IOException{
-        String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
-        String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
-        String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
-       // String propertyUsageDbid = "{http://www.alfresco.org/model/system/1.0}node-dbid";
+    public void indexCollections(NodeMetadata usageOrProposal) throws IOException{
 
-        String nodeIdCollection = (String)usage.getProperties().get(propertyUsageCourseId);
-        String nodeIdIO = (String)usage.getProperties().get(propertyUsageParentNodeId);
-        String usageAppId = (String)usage.getProperties().get(propertyUsageAppId);
-        Long usageDbId = usage.getId();
+        String nodeIdCollection = null;
+        String nodeIdIO = null;
+        Long usageDbId = null;
+        Long proposalDbId = null;
 
+        if(!(usageOrProposal.getType().equals("ccm:usage") || usageOrProposal.getType().equals("ccm:collection_proposal"))){
+            throw new IOException("wrong type:"+usageOrProposal.getType());
+        }
 
-        //check if it is an collection usage
-        if(!homeRepoId.equals(usageAppId)){
-            return;
+        if(usageOrProposal.getType().equals("ccm:usage")){
+            String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
+            String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
+            String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
+
+            nodeIdCollection = (String)usageOrProposal.getProperties().get(propertyUsageCourseId);
+            nodeIdIO = (String)usageOrProposal.getProperties().get(propertyUsageParentNodeId);
+            String usageAppId = (String)usageOrProposal.getProperties().get(propertyUsageAppId);
+            usageDbId = usageOrProposal.getId();
+            //check if it is an collection usage
+            if(!homeRepoId.equals(usageAppId)){
+                return;
+            }
+        }
+        if(usageOrProposal.getType().equals("ccm:collection_proposal")){
+            List<String> parentUuids = Arrays.asList(usageOrProposal.getPaths().get(0).getApath().split("/"));
+            nodeIdCollection = parentUuids.stream().skip(parentUuids.size() -1).findFirst().get();
+            String ioNodeRef = usageOrProposal.getProperties().get("{http://www.campuscontent.de/model/1.0}collection_proposal_target").toString();
+            nodeIdIO = Tools.getUUID(ioNodeRef);
+            proposalDbId = usageOrProposal.getId();
         }
 
         QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
@@ -709,15 +725,13 @@ public class ElasticsearchClient {
                     }
                 }
 
-
                 builder.startObject();
                 for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
                     builder.field(entry.getKey(), entry.getValue());
                 }
-                builder.field("usagedbid",usageDbId);
+                if(usageDbId != null) builder.field("usagedbid", usageDbId);
+                if(proposalDbId != null) builder.field("proposaldbid", proposalDbId);
                 builder.endObject();
-
-
             builder.endArray();
         }
         builder.endObject();
@@ -878,10 +892,13 @@ public class ElasticsearchClient {
     private void onUpdateRefreshUsageCollectionReplicas(NodeMetadata node) throws IOException {
 
         String query = null;
+        String queryProposal = null;
         if("ccm:map".equals(node.getType())){
             query = "properties.ccm:usagecourseid.keyword";
+            queryProposal = "parentRef.id";
         }else if("ccm:io".equals(node.getType())){
             query = "properties.ccm:usageparentnodeid.keyword";
+            queryProposal = "properties.ccm:collection_proposal_target.keyword";
         }else{
             logger.info("can not handle collections for type:" + node.getType());
             return;
@@ -890,24 +907,33 @@ public class ElasticsearchClient {
         logger.info("updateing collections for " + node.getType() +" " +node.getId());
 
        //find usages for collection
-        QueryBuilder queryUsages = QueryBuilders.termQuery(query, Tools.getUUID(node.getNodeRef()));
-        new SearchHitsRunner(this){
+        QueryBuilder queryUsages = QueryBuilders.boolQuery().must(QueryBuilders.termQuery(query, Tools.getUUID(node.getNodeRef())))
+                .must(QueryBuilders.termQuery("type","ccm:usage"));
+        QueryBuilder queryProposals = ("ccm:io".equals(node.getType()))
+                ? QueryBuilders.termQuery(queryProposal, node.getNodeRef())
+                : QueryBuilders.termQuery(queryProposal, Tools.getUUID(node.getNodeRef()));
+        queryProposals = QueryBuilders.boolQuery().must(queryProposals)
+                .must(QueryBuilders.termQuery("type","ccm:collection_proposal"));
+        SearchHitsRunner shr = new SearchHitsRunner(this){
 
             @Override
             public void execute(SearchHit hit) throws IOException {
-                long usageDbId = ((Number)hit.getSourceAsMap().get("dbid")).longValue();
+                long dbId = ((Number)hit.getSourceAsMap().get("dbid")).longValue();
                 GetNodeMetadataParam param = new GetNodeMetadataParam();
-                param.setNodeIds(Arrays.asList(new Long[]{usageDbId}));
+                param.setNodeIds(Arrays.asList(new Long[]{dbId}));
                 NodeMetadatas nodeMetadatas = alfrescoClient.getNodeMetadata(param);
                 if(nodeMetadatas == null || nodeMetadatas.getNodes() == null || nodeMetadatas.getNodes().size() == 0){
-                    logger.error("could not find usage object in alfresco with dbid:" + usageDbId);
+                    logger.error("could not find usage/proposal object in alfresco with dbid:" + dbId);
                     return;
                 }
                 NodeMetadata usage = nodeMetadatas.getNodes().get(0);
-                logger.info("running indexCollections for usage: " + usageDbId);
+                logger.info("running indexCollections for usage: " + dbId);
                 indexCollections(usage);
             }
-        }.run(queryUsages);
+        };
+        shr.run(queryUsages);
+        shr.run(queryProposals);
+
     }
 
     private String getMultilangValue(List listvalue){
