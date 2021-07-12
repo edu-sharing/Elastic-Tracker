@@ -655,8 +655,10 @@ public class ElasticsearchClient {
 
         String nodeIdCollection = null;
         String nodeIdIO = null;
-        Long usageDbId = null;
-        Long proposalDbId = null;
+     //   Long usageDbId = null;
+     //   Long proposalDbId = null;
+        Map<String,Serializable> usageData = null;
+        Map<String,Serializable> proposalData = null;
 
         if(!(usageOrProposal.getType().equals("ccm:usage") || usageOrProposal.getType().equals("ccm:collection_proposal"))){
             throw new IOException("wrong type:"+usageOrProposal.getType());
@@ -670,7 +672,11 @@ public class ElasticsearchClient {
             nodeIdCollection = (String)usageOrProposal.getProperties().get(propertyUsageCourseId);
             nodeIdIO = (String)usageOrProposal.getProperties().get(propertyUsageParentNodeId);
             String usageAppId = (String)usageOrProposal.getProperties().get(propertyUsageAppId);
-            usageDbId = usageOrProposal.getId();
+
+            usageData = new HashMap<>();
+            usageData.put(Constants.COLLECTION_REPL_USAGE_DBID,usageOrProposal.getId());
+            usageData.put(Constants.COLLECTION_REPL_USAGE_UUID,Tools.getUUID(usageOrProposal.getNodeRef()));
+
             //check if it is an collection usage
             if(!homeRepoId.equals(usageAppId)){
                 return;
@@ -681,7 +687,12 @@ public class ElasticsearchClient {
             nodeIdCollection = parentUuids.stream().skip(parentUuids.size() -1).findFirst().get();
             String ioNodeRef = usageOrProposal.getProperties().get("{http://www.campuscontent.de/model/1.0}collection_proposal_target").toString();
             nodeIdIO = Tools.getUUID(ioNodeRef);
-            proposalDbId = usageOrProposal.getId();
+            proposalData = new HashMap<>();
+            proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_DBID,usageOrProposal.getId());
+            proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_UUID,Tools.getUUID(usageOrProposal.getNodeRef()));
+            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_COMMENT),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_COMMENT));
+            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_TARGET),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_TARGET));
+            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_STATUS),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_STATUS));
         }
 
         QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
@@ -729,8 +740,13 @@ public class ElasticsearchClient {
                 for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
                     builder.field(entry.getKey(), entry.getValue());
                 }
-                if(usageDbId != null) builder.field("usagedbid", usageDbId);
-                if(proposalDbId != null) builder.field("proposaldbid", proposalDbId);
+
+                Map<String,Serializable> replicateData = null;
+                replicateData = (usageData != null) ? usageData : ((proposalData != null) ?proposalData : new HashMap<>());
+                for(Map.Entry<String,Serializable> entry : replicateData.entrySet()){
+                    builder.field(entry.getKey(),entry.getValue());
+                }
+                
                 builder.endObject();
             builder.endArray();
         }
@@ -764,7 +780,7 @@ public class ElasticsearchClient {
             QueryBuilder queryUsage = QueryBuilders.termQuery("collections.usagedbid",node.getId());
             SearchHits searchHitsIO = this.search(INDEX_WORKSPACE,queryUsage,0,1);
             if(searchHitsIO.getTotalHits().value > 0){
-                collectionCheckAttribute = "usagedbid";
+                collectionCheckAttribute = Constants.COLLECTION_REPL_USAGE_DBID;
                 collectionCheckQuery = queryUsage;
             }
 
@@ -1274,7 +1290,7 @@ public class ElasticsearchClient {
 
                             .startObject("properties")
                                 .startObject("dbid").field("type","long").endObject()
-                                .startObject("usagedbid").field("type","long").endObject()
+                                .startObject(Constants.COLLECTION_REPL_USAGE_DBID).field("type","long").endObject()
                                 .startObject("aclId").field("type","long").endObject()
                             .endObject()
 

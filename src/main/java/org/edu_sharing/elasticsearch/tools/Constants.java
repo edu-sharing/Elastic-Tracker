@@ -39,6 +39,21 @@ public class Constants {
 
     public final static String STORE_REF_ARCHIV = "archive://SpacesStore";
 
+    public final static String COLLECTION_REPL_USAGE_DBID = "usage:node-dbid";
+
+    public final static String COLLECTION_REPL_USAGE_UUID = "usage:node-uuid";
+
+    public final static String COLLECTION_REPL_PROPOSAL_DBID = "proposal:node-dbid";
+
+    public final static String COLLECTION_REPL_PROPOSAL_UUID = "proposal:node-uuid";
+
+    public final static String CCM_PROP_COLLECTION_PROPOSAL_STATUS = "{"+NAMESPACE_CCM+"}collection_proposal_status";
+
+    public final static String CCM_PROP_COLLECTION_PROPOSAL_COMMENT = "{"+NAMESPACE_CCM+"}collection_proposal_comment";
+
+    public final static String CCM_PROP_COLLECTION_PROPOSAL_TARGET = "{"+NAMESPACE_CCM+"}collection_proposal_target";
+
+
     /**
      * @return <namespace,localnamespace>
      */
