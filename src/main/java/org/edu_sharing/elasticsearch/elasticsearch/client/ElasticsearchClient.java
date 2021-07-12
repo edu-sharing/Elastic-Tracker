@@ -655,8 +655,6 @@ public class ElasticsearchClient {
 
         String nodeIdCollection = null;
         String nodeIdIO = null;
-     //   Long usageDbId = null;
-     //   Long proposalDbId = null;
         Map<String,Serializable> usageData = null;
         Map<String,Serializable> proposalData = null;
 
@@ -729,6 +727,7 @@ public class ElasticsearchClient {
                         if(!searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"))){
                             builder.startObject();
                             for(Map.Entry<String,Object> entry : collection.entrySet()){
+                                if(entry.getKey().equals("children")) continue;
                                 builder.field(entry.getKey(),entry.getValue());
                             }
                             builder.endObject();
@@ -738,6 +737,7 @@ public class ElasticsearchClient {
 
                 builder.startObject();
                 for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
+                    if(entry.getKey().equals("children")) continue;
                     builder.field(entry.getKey(), entry.getValue());
                 }
 
@@ -746,7 +746,7 @@ public class ElasticsearchClient {
                 for(Map.Entry<String,Serializable> entry : replicateData.entrySet()){
                     builder.field(entry.getKey(),entry.getValue());
                 }
-                
+
                 builder.endObject();
             builder.endArray();
         }
