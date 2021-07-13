@@ -49,3 +49,8 @@ This application fetches data via the Alfresco/Solr API and pushes them into an 
     [Install]
     WantedBy=multi-user.target
    ```
+   
+4. If you want to use elastic search as a search engine in edu-sharing:
+   Login as Admin, go to `Admin-Tools` -> `Extended configuration` -> `edit homeApplication.properties.xml`
+   
+   Search or create a key named `remote_provider` with the value `org.edu_sharing.service.provider.ElasticSearchProvider`
