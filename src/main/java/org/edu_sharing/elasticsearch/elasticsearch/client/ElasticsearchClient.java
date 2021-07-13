@@ -1197,6 +1197,8 @@ public class ElasticsearchClient {
                                         .endObject()
                                     .endObject()
                                 .endObject()
+                            .endObject()
+                            .startObject()
                                 .startObject("convert_numeric_double")
                                     .field("match_mapping_type","double")
                                     .field("path_match","*properties.*")
