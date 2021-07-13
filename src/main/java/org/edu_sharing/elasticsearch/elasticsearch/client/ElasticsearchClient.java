@@ -673,14 +673,14 @@ public class ElasticsearchClient {
 
         SearchHits searchHitsCollection = this.search(INDEX_WORKSPACE,collectionQuery,0,1);
         if(searchHitsCollection == null || searchHitsCollection.getTotalHits().value == 0){
-            logger.error("no collection found for: " + nodeIdCollection);
+            logger.warn("no collection found for: " + nodeIdCollection);
             return;
         }
         SearchHit searchHitCollection = searchHitsCollection.getHits()[0];
 
         SearchHits ioSearchHits = this.search(INDEX_WORKSPACE,ioQuery,0,1);
         if(ioSearchHits == null || ioSearchHits.getTotalHits().value == 0){
-            logger.error("no io found for: " + nodeIdIO);
+            logger.warn("no io found for: " + nodeIdIO);
             return;
         }
 
