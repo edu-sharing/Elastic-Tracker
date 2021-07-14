@@ -724,7 +724,9 @@ public class ElasticsearchClient {
            builder.startArray("collections");
                 if(collections != null && collections.size() > 0){
                     for(Map<String,Object> collection : collections){
-                        if(!searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"))){
+                        boolean colIsTheSame = searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"));
+                        long dbidRelation = ((Number)((Map<String,Object>)collection.get("relation")).get("dbid")).longValue();
+                        if(!colIsTheSame || (colIsTheSame && dbidRelation != usageOrProposal.getId())){
                             builder.startObject();
                             for(Map.Entry<String,Object> entry : collection.entrySet()){
                                 if(entry.getKey().equals("children")) continue;
