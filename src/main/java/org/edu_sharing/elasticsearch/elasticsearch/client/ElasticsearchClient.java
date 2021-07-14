@@ -327,6 +327,9 @@ public class ElasticsearchClient {
     }
 
     private XContentBuilder get(NodeData nodeData,XContentBuilder builder) throws IOException {
+        return get(nodeData,builder,null);
+    }
+    private XContentBuilder get(NodeData nodeData,XContentBuilder builder, String objectName) throws IOException {
 
         NodeMetadata node = nodeData.getNodeMetadata();
         String storeRefProtocol = Tools.getProtocol(node.getNodeRef());
@@ -336,7 +339,7 @@ public class ElasticsearchClient {
             builder = jsonBuilder();
         }
 
-        builder.startObject();
+        if(objectName != null) builder.startObject(objectName); else builder.startObject();
         {
             builder.field("aclId",  node.getAclId());
             builder.field("txnId",node.getTxnId());
@@ -688,9 +691,6 @@ public class ElasticsearchClient {
             proposalData = new HashMap<>();
             proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_DBID,usageOrProposal.getId());
             proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_UUID,Tools.getUUID(usageOrProposal.getNodeRef()));
-            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_COMMENT),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_COMMENT));
-            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_TARGET),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_TARGET));
-            proposalData.put(Constants.getValidLocalName(Constants.CCM_PROP_COLLECTION_PROPOSAL_STATUS),usageOrProposal.getProperties().get(Constants.CCM_PROP_COLLECTION_PROPOSAL_STATUS));
         }
 
         QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
@@ -746,6 +746,15 @@ public class ElasticsearchClient {
                 for(Map.Entry<String,Serializable> entry : replicateData.entrySet()){
                     builder.field(entry.getKey(),entry.getValue());
                 }
+
+
+                /**
+                 * check performance, if this call is to slow we could build the metadata structure by hand (instead using get)
+                 * for usages: we could resolve the collection_ref object to have alternate metadata and store it in relation field
+                 * but it would be another call and could make the indexing process slower.
+                 * for the future: maybe it's better to react on collection_ref object index actions than usage index actions
+                 */
+                get(alfrescoClient.getNodeData(Arrays.asList(new NodeMetadata[]{usageOrProposal})).get(0), builder,"relation");
 
                 builder.endObject();
             builder.endArray();
