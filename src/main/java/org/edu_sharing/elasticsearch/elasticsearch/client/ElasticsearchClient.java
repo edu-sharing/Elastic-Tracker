@@ -658,8 +658,6 @@ public class ElasticsearchClient {
 
         String nodeIdCollection = null;
         String nodeIdIO = null;
-        Map<String,Serializable> usageData = null;
-        Map<String,Serializable> proposalData = null;
 
         if(!(usageOrProposal.getType().equals("ccm:usage") || usageOrProposal.getType().equals("ccm:collection_proposal"))){
             throw new IOException("wrong type:"+usageOrProposal.getType());
@@ -674,10 +672,6 @@ public class ElasticsearchClient {
             nodeIdIO = (String)usageOrProposal.getProperties().get(propertyUsageParentNodeId);
             String usageAppId = (String)usageOrProposal.getProperties().get(propertyUsageAppId);
 
-            usageData = new HashMap<>();
-            usageData.put(Constants.COLLECTION_REPL_USAGE_DBID,usageOrProposal.getId());
-            usageData.put(Constants.COLLECTION_REPL_USAGE_UUID,Tools.getUUID(usageOrProposal.getNodeRef()));
-
             //check if it is an collection usage
             if(!homeRepoId.equals(usageAppId)){
                 return;
@@ -688,9 +682,6 @@ public class ElasticsearchClient {
             nodeIdCollection = parentUuids.stream().skip(parentUuids.size() -1).findFirst().get();
             String ioNodeRef = usageOrProposal.getProperties().get("{http://www.campuscontent.de/model/1.0}collection_proposal_target").toString();
             nodeIdIO = Tools.getUUID(ioNodeRef);
-            proposalData = new HashMap<>();
-            proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_DBID,usageOrProposal.getId());
-            proposalData.put(Constants.COLLECTION_REPL_PROPOSAL_UUID,Tools.getUUID(usageOrProposal.getNodeRef()));
         }
 
         QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
@@ -743,13 +734,6 @@ public class ElasticsearchClient {
                     builder.field(entry.getKey(), entry.getValue());
                 }
 
-                Map<String,Serializable> replicateData = null;
-                replicateData = (usageData != null) ? usageData : ((proposalData != null) ?proposalData : new HashMap<>());
-                for(Map.Entry<String,Serializable> entry : replicateData.entrySet()){
-                    builder.field(entry.getKey(),entry.getValue());
-                }
-
-
                 /**
                  * check performance, if this call is to slow we could build the metadata structure by hand (instead using get)
                  * for usages: we could resolve the collection_ref object to have alternate metadata and store it in relation field
@@ -783,15 +767,13 @@ public class ElasticsearchClient {
         List<UpdateRequest> updateRequests = new ArrayList<>();
         for(Node node : nodes){
 
-            String collectionCheckAttribute = null;
             QueryBuilder collectionCheckQuery = null;
             /**
-             * try it is a usage
+             * try it is a usage or proposal
              */
-            QueryBuilder queryUsage = QueryBuilders.termQuery("collections.usagedbid",node.getId());
+            QueryBuilder queryUsage = QueryBuilders.termQuery("collections.relation.dbid",node.getId());
             SearchHits searchHitsIO = this.search(INDEX_WORKSPACE,queryUsage,0,1);
             if(searchHitsIO.getTotalHits().value > 0){
-                collectionCheckAttribute = Constants.COLLECTION_REPL_USAGE_DBID;
                 collectionCheckQuery = queryUsage;
             }
 
@@ -799,33 +781,21 @@ public class ElasticsearchClient {
              * try it is an collection
              */
             QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", node.getId());
-            if(collectionCheckAttribute == null) {
+            if(collectionCheckQuery == null) {
                 searchHitsIO = this.search(INDEX_WORKSPACE, queryCollection, 0, 1);
                 if (searchHitsIO.getTotalHits().value > 0) {
-                    collectionCheckAttribute = "dbid";
                     collectionCheckQuery = queryCollection;
                 }
             }
 
-            /**
-             * try it is an proposal proposaldbid
-             */
-            QueryBuilder queryProposal = QueryBuilders.termQuery("collections.proposaldbid",node.getId());
-            if(collectionCheckAttribute == null) {
-                searchHitsIO = this.search(INDEX_WORKSPACE,queryProposal,0,1);
-                if(searchHitsIO.getTotalHits().value > 0){
-                    collectionCheckAttribute = "proposaldbid";
-                    collectionCheckQuery = queryProposal;
-                }
-            }
 
 
             //nothing to cleanup
-            if(collectionCheckAttribute == null){
+            if(collectionCheckQuery == null){
                 continue;
             }
-            final String checkAtt = collectionCheckAttribute;
-            logger.info("cleanup collection cause " + (collectionCheckAttribute.equals("dbid")? "collection deleted" : "usage deleted"));
+            boolean collectionDeleted = collectionCheckQuery.equals(queryCollection);
+            logger.info("cleanup collection cause " + (collectionDeleted? "collection deleted" : "usage/proposal deleted"));
             new SearchHitsRunner(this){
                 @Override
                 public void execute(SearchHit hitIO) throws IOException {
@@ -838,9 +808,15 @@ public class ElasticsearchClient {
                             for (Map<String, Object> collection : collections) {
                                 long nodeDbId = node.getId();
 
-                                Object collCeckAttValue = collection.get(checkAtt);
+                                Object collCeckAttValue = null;
+                                if(collectionDeleted){
+                                    collCeckAttValue = collection.get("dbid");
+                                }else{
+                                    collCeckAttValue = ((HashMap)collection.get("relation")).get("dbid");
+                                }
+
                                 if(collCeckAttValue == null){
-                                    logger.error("replicated collection " + collection.get("dbid") + " does not have a property " + checkAtt +" will leave it out");
+                                    logger.error("replicated collection " + collection.get("dbid") + " does not have a property to check will leave it out");
                                     continue;
                                 }
                                 long collectionAttValue = Long.parseLong(collCeckAttValue.toString());
@@ -1321,7 +1297,6 @@ public class ElasticsearchClient {
 
                             .startObject("properties")
                                 .startObject("dbid").field("type","long").endObject()
-                                .startObject(Constants.COLLECTION_REPL_USAGE_DBID).field("type","long").endObject()
                                 .startObject("aclId").field("type","long").endObject()
                             .endObject()
 
