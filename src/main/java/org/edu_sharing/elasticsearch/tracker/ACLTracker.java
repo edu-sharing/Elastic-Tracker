@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -173,7 +174,9 @@ public class ACLTracker {
             logger.error("elastic search server not reachable", e);
         }
 
-        logger.info("finished lastACLChangeSetId:" + last.getId());
+        Double percentage = (aclChangeSets != null) ? new Double(((double) aclChangeSets.getAclChangeSets().get(aclChangeSets.getAclChangeSets().size() - 1).getId() - 1) / (double) aclChangeSets.getMaxChangeSetId() * 100.0)  : 0.0;
+        DecimalFormat df = new DecimalFormat("0.00");
+        logger.info("finished "+df.format(percentage)+"% lastACLChangeSetId:" + last.getId());
         return true;
     }
 }
