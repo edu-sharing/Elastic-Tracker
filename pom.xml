@@ -48,13 +48,17 @@
     <deps.elasticsearch.version>7.8.0</deps.elasticsearch.version>
     <deps.jersey.version>2.29.1</deps.jersey.version>
     <java.version>1.8</java.version>
-	<cxf.version>3.4.2</cxf.version>
+    <cxf.version>3.4.2</cxf.version>
     <jackson.version>2.12.1</jackson.version>
   </properties>
 
   <dependencies>
 
-
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+      <version>4.6.1</version>
+    </dependency>
 
     <dependency>
       <groupId>net.sourceforge.cardme</groupId>
@@ -89,51 +93,51 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-core</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-databind</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <dependency>
-	  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-	  <artifactId>jackson-jaxrs-json-provider</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
-  <dependency>
-	  <groupId>com.fasterxml.jackson.core</groupId>
-	  <artifactId>jackson-annotations</artifactId>
-	  <version>${jackson.version}</version>
-  </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.jaxrs</groupId>
+      <artifactId>jackson-jaxrs-json-provider</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-rs-client</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-rs-extension-providers</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.apache.cxf</groupId>
-		<artifactId>cxf-rt-transports-http-hc</artifactId>
-		<version>${cxf.version}</version>
-	</dependency>
-	<dependency>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter</artifactId>
-	</dependency>
+    <dependency>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-rs-client</artifactId>
+      <version>${cxf.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-rs-extension-providers</artifactId>
+      <version>${cxf.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cxf</groupId>
+      <artifactId>cxf-rt-transports-http-hc</artifactId>
+      <version>${cxf.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -146,11 +150,11 @@
         </exclusion>
       </exclusions>
     </dependency>
-      <dependency>
-          <groupId>org.springframework</groupId>
-          <artifactId>spring-aop</artifactId>
-          <version>5.2.6.RELEASE</version>
-      </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-aop</artifactId>
+      <version>5.2.6.RELEASE</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-aop</artifactId>
@@ -164,6 +168,52 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>id.compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <exec executable="git" outputproperty="git.version" failifexecutionfails="false" errorproperty="">
+                  <arg value="log"/>
+                  <arg value="-1"/>
+                  <arg value="--format=%h-%an-%ai"/>
+                </exec>
+                <propertyfile file="src/main/resources/version.properties">
+                  <entry key="git.version" value="${git.version}"/>
+                </propertyfile>
+                <echo>${git.version}</echo>
+              </tasks>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <!-- annotationProcessorPaths requires maven-compiler-plugin version 3.5 or higher -->
+        <configuration>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>info.picocli</groupId>
+              <artifactId>picocli-codegen</artifactId>
+              <version>4.6.1</version>
+            </path>
+          </annotationProcessorPaths>
+          <compilerArgs>
+            <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
     </plugins>
   </build>
 
