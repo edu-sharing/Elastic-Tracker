@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import picocli.CommandLine;
 
 import java.io.InputStream;
+import java.util.Map;
 import java.util.Properties;
 
 @Component
@@ -15,12 +16,14 @@ public class VersionProvider implements CommandLine.IVersionProvider {
     @Override
     public String[] getVersion() throws Exception {
         try (
-                InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("version.properties");
-        ){
+                InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("git.properties");
+        ) {
             Properties prop = new Properties();
             prop.load(stream);
-            return new String[]{prop.getProperty("git.version")};
-            }
+            StringBuffer buffer = new StringBuffer();
+            prop.entrySet().forEach((entry -> buffer.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n")));
+            return new String[]{buffer.toString()};
+        }
     }
 
     public VersionProvider() {
