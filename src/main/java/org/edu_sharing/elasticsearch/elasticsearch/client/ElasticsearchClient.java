@@ -144,7 +144,7 @@ public class ElasticsearchClient {
         settingsRequest.settings(Settings.builder().put("index.mapping.total_fields.limit", 5000).build());
         client.indices().putSettings(settingsRequest, RequestOptions.DEFAULT);
     }
-    private void deleteIndex(String index) throws IOException{
+    public void deleteIndex(String index) throws IOException{
         DeleteIndexRequest request = new DeleteIndexRequest(index);
         client.indices().delete(request, RequestOptions.DEFAULT);
     }
