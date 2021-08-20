@@ -161,39 +161,28 @@
     </dependency>
 
   </dependencies>
-
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <excludes>
+          <exclude>version.properties</exclude>
+        </excludes>
+        <filtering>false</filtering>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <includes>
+          <include>version.properties</include>
+        </includes>
+        <filtering>true</filtering>
+      </resource>
+      <!---->
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>id.compile</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <configuration>
-              <tasks>
-                <exec executable="git" outputproperty="git.version" failifexecutionfails="false" errorproperty="">
-                  <arg value="log"/>
-                  <arg value="-1"/>
-                  <arg value="--format=%h-%an-%ai"/>
-                </exec>
-                <propertyfile file="src/main/resources/version.properties">
-                  <entry key="git.version" value="${git.version}"/>
-                </propertyfile>
-                <echo>${git.version}</echo>
-              </tasks>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
 
       <plugin>
