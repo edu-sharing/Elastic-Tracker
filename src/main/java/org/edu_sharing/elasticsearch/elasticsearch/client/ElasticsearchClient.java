@@ -673,14 +673,14 @@ public class ElasticsearchClient {
 
         SearchHits searchHitsCollection = this.search(INDEX_WORKSPACE,collectionQuery,0,1);
         if(searchHitsCollection == null || searchHitsCollection.getTotalHits().value == 0){
-            logger.error("no collection found for: " + nodeIdCollection);
+            logger.warn("no collection found for: " + nodeIdCollection);
             return;
         }
         SearchHit searchHitCollection = searchHitsCollection.getHits()[0];
 
         SearchHits ioSearchHits = this.search(INDEX_WORKSPACE,ioQuery,0,1);
         if(ioSearchHits == null || ioSearchHits.getTotalHits().value == 0){
-            logger.error("no io found for: " + nodeIdIO);
+            logger.warn("no io found for: " + nodeIdIO);
             return;
         }
 
@@ -1127,7 +1127,7 @@ public class ElasticsearchClient {
                                 .endObject()
                             .endObject()
                             .startObject()
-                                .startObject("convert_numeric")
+                                .startObject("convert_numeric_long")
                                     .field("match_mapping_type","long")
                                     .field("path_match","*properties.*")
                                     .startObject("mapping")
@@ -1135,7 +1135,27 @@ public class ElasticsearchClient {
                                         .field("store", true)
                                         .startObject("fields")
                                             .startObject("keyword").field("type", "keyword").field("ignore_above", 256).endObject()
-                                            .startObject("number").field("type", "long").endObject()
+                                            .startObject("number").
+                                                field("type", "long").
+                                                field("ignore_malformed", true)
+                                            .endObject()
+                                        .endObject()
+                                    .endObject()
+                                .endObject()
+                            .endObject()
+                            .startObject()
+                                .startObject("convert_numeric_double")
+                                    .field("match_mapping_type","double")
+                                    .field("path_match","*properties.*")
+                                    .startObject("mapping")
+                                        .field("type", "text")
+                                        .field("store", true)
+                                        .startObject("fields")
+                                            .startObject("keyword").field("type", "keyword").field("ignore_above", 256).endObject()
+                                            .startObject("number").
+                                                field("type", "float").
+                                                field("ignore_malformed", true)
+                                            .endObject()
                                         .endObject()
                                     .endObject()
                                 .endObject()
