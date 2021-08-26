@@ -9,6 +9,7 @@ import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
+@Component
 @CommandLine.Command(helpCommand = false, mixinStandardHelpOptions = true, versionProvider = VersionProvider.class)
 public class CLI implements Callable<Integer>
 {
