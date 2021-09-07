@@ -716,14 +716,18 @@ public class ElasticsearchClient {
                 if(collections != null && collections.size() > 0){
                     for(Map<String,Object> collection : collections){
                         boolean colIsTheSame = searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"));
-                        long dbidRelation = ((Number)((Map<String,Object>)collection.get("relation")).get("dbid")).longValue();
-                        if(!colIsTheSame || (colIsTheSame && dbidRelation != usageOrProposal.getId())){
-                            builder.startObject();
-                            for(Map.Entry<String,Object> entry : collection.entrySet()){
-                                if(entry.getKey().equals("children")) continue;
-                                builder.field(entry.getKey(),entry.getValue());
+
+                        Map<String,Object> relation = (Map<String,Object>)collection.get("relation");
+                        if(relation != null) {
+                            long dbidRelation = ((Number) (relation.get("dbid"))).longValue();
+                            if (!colIsTheSame || (colIsTheSame && dbidRelation != usageOrProposal.getId())) {
+                                builder.startObject();
+                                for (Map.Entry<String, Object> entry : collection.entrySet()) {
+                                    if (entry.getKey().equals("children")) continue;
+                                    builder.field(entry.getKey(), entry.getValue());
+                                }
+                                builder.endObject();
                             }
-                            builder.endObject();
                         }
                     }
                 }
