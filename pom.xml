@@ -17,30 +17,12 @@
   <version>git</version>
 
   <name>edu_sharing-community-repository-backend-search-elastic-tracker</name>
-  <description>edu-sharing repository - tracker for elasticsearch</description>
-
-  <url>https://edu-sharing.net</url>
-
-  <inceptionYear>2020</inceptionYear>
-
-  <licenses>
-    <license>
-      <name>GNU General Public License v3.0</name>
-      <url>https://www.gnu.org/licenses/gpl-3.0</url>
-      <distribution>repo</distribution>
-    </license>
-  </licenses>
-
-  <organization>
-    <name>metaventis GmbH</name>
-    <url>http://www.metaventis.com/</url>
-  </organization>
 
   <scm>
-    <connection>scm:git:https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git</connection>
-    <developerConnection>scm:git:https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git
+    <connection>scm:git:https://scm.edu-sharing.com/Repository/edu-sharing-elasticsearch-tracker.git</connection>
+    <developerConnection>scm:git:https://scm.edu-sharing.com/Repository/edu-sharing-elasticsearch-tracker.git
     </developerConnection>
-    <url>https://scm.edu-sharing.com/rudolph/edu-sharing-elasticsearch-tracker.git</url>
+    <url>https://scm.edu-sharing.com/Repository/edu-sharing-elasticsearch-tracker.git</url>
   </scm>
 
   <properties>
@@ -194,28 +176,6 @@
             <goals>
               <goal>repackage</goal>
             </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>enforce</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <phase>validate</phase>
-            <configuration>
-              <rules>
-                <requireReleaseDeps>
-                  <message>No Snapshots Allowed!</message>
-                  <onlyWhenRelease>true</onlyWhenRelease>
-                </requireReleaseDeps>
-              </rules>
-            </configuration>
           </execution>
         </executions>
       </plugin>
