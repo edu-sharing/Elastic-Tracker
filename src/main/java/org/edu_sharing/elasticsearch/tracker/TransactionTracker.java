@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
@@ -299,8 +300,9 @@ public class TransactionTracker {
             logger.error(e.getMessage(),e);
         }
 
-
-        logger.info("finished lastTransactionId:" + last.getId() +
+        Double percentage = (transactionIds != null && transactionIds.size() > 0) ? new Double(((double)transactionIds.get(transactionIds.size() - 1) / (double)transactions.getMaxTxnId()) * 100.0)  : 0.0;
+        DecimalFormat df = new DecimalFormat("0.00");
+        logger.info("finished "+df.format(percentage)+"%, lastTransactionId:" + last.getId() +
                 " transactions:" + Arrays.toString(transactionIds.toArray()) +
                 " nodes:" + nodes.size());
         return true;
