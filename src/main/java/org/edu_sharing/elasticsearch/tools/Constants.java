@@ -38,6 +38,8 @@ public class Constants {
     public final static String STORE_REF_WORKSPACE = "workspace://SpacesStore";
 
     public final static String STORE_REF_ARCHIV = "archive://SpacesStore";
+    
+
 
     /**
      * @return <namespace,localnamespace>

@@ -327,6 +327,9 @@ public class ElasticsearchClient {
     }
 
     private XContentBuilder get(NodeData nodeData,XContentBuilder builder) throws IOException {
+        return get(nodeData,builder,null);
+    }
+    private XContentBuilder get(NodeData nodeData,XContentBuilder builder, String objectName) throws IOException {
 
         NodeMetadata node = nodeData.getNodeMetadata();
         String storeRefProtocol = Tools.getProtocol(node.getNodeRef());
@@ -336,7 +339,7 @@ public class ElasticsearchClient {
             builder = jsonBuilder();
         }
 
-        builder.startObject();
+        if(objectName != null) builder.startObject(objectName); else builder.startObject();
         {
             builder.field("aclId",  node.getAclId());
             builder.field("txnId",node.getTxnId());
@@ -651,21 +654,34 @@ public class ElasticsearchClient {
         logger.debug("returning");
     }
 
-    public void indexCollections(NodeMetadata usage) throws IOException{
-        String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
-        String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
-        String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
-       // String propertyUsageDbid = "{http://www.alfresco.org/model/system/1.0}node-dbid";
+    public void indexCollections(NodeMetadata usageOrProposal) throws IOException{
 
-        String nodeIdCollection = (String)usage.getProperties().get(propertyUsageCourseId);
-        String nodeIdIO = (String)usage.getProperties().get(propertyUsageParentNodeId);
-        String usageAppId = (String)usage.getProperties().get(propertyUsageAppId);
-        Long usageDbId = usage.getId();
+        String nodeIdCollection = null;
+        String nodeIdIO = null;
 
+        if(!(usageOrProposal.getType().equals("ccm:usage") || usageOrProposal.getType().equals("ccm:collection_proposal"))){
+            throw new IOException("wrong type:"+usageOrProposal.getType());
+        }
 
-        //check if it is an collection usage
-        if(!homeRepoId.equals(usageAppId)){
-            return;
+        if(usageOrProposal.getType().equals("ccm:usage")){
+            String propertyUsageAppId = "{http://www.campuscontent.de/model/1.0}usageappid";
+            String propertyUsageCourseId = "{http://www.campuscontent.de/model/1.0}usagecourseid";
+            String propertyUsageParentNodeId = "{http://www.campuscontent.de/model/1.0}usageparentnodeid";
+
+            nodeIdCollection = (String)usageOrProposal.getProperties().get(propertyUsageCourseId);
+            nodeIdIO = (String)usageOrProposal.getProperties().get(propertyUsageParentNodeId);
+            String usageAppId = (String)usageOrProposal.getProperties().get(propertyUsageAppId);
+
+            //check if it is an collection usage
+            if(!homeRepoId.equals(usageAppId)){
+                return;
+            }
+        }
+        if(usageOrProposal.getType().equals("ccm:collection_proposal")){
+            List<String> parentUuids = Arrays.asList(usageOrProposal.getPaths().get(0).getApath().split("/"));
+            nodeIdCollection = parentUuids.stream().skip(parentUuids.size() -1).findFirst().get();
+            String ioNodeRef = usageOrProposal.getProperties().get("{http://www.campuscontent.de/model/1.0}collection_proposal_target").toString();
+            nodeIdIO = Tools.getUUID(ioNodeRef);
         }
 
         QueryBuilder collectionQuery = QueryBuilders.termQuery("properties.sys:node-uuid",nodeIdCollection);
@@ -699,25 +715,38 @@ public class ElasticsearchClient {
            builder.startArray("collections");
                 if(collections != null && collections.size() > 0){
                     for(Map<String,Object> collection : collections){
-                        if(!searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"))){
-                            builder.startObject();
-                            for(Map.Entry<String,Object> entry : collection.entrySet()){
-                                builder.field(entry.getKey(),entry.getValue());
+                        boolean colIsTheSame = searchHitCollection.getSourceAsMap().get("dbid").equals(collection.get("dbid"));
+
+                        Map<String,Object> relation = (Map<String,Object>)collection.get("relation");
+                        if(relation != null) {
+                            long dbidRelation = ((Number) (relation.get("dbid"))).longValue();
+                            if (!colIsTheSame || (colIsTheSame && dbidRelation != usageOrProposal.getId())) {
+                                builder.startObject();
+                                for (Map.Entry<String, Object> entry : collection.entrySet()) {
+                                    if (entry.getKey().equals("children")) continue;
+                                    builder.field(entry.getKey(), entry.getValue());
+                                }
+                                builder.endObject();
                             }
-                            builder.endObject();
                         }
                     }
                 }
 
-
                 builder.startObject();
                 for (Map.Entry<String, Object> entry : searchHitCollection.getSourceAsMap().entrySet()) {
+                    if(entry.getKey().equals("children")) continue;
                     builder.field(entry.getKey(), entry.getValue());
                 }
-                builder.field("usagedbid",usageDbId);
+
+                /**
+                 * check performance, if this call is to slow we could build the metadata structure by hand (instead using get)
+                 * for usages: we could resolve the collection_ref object to have alternate metadata and store it in relation field
+                 * but it would be another call and could make the indexing process slower.
+                 * for the future: maybe it's better to react on collection_ref object index actions than usage index actions
+                 */
+                get(alfrescoClient.getNodeData(Arrays.asList(new NodeMetadata[]{usageOrProposal})).get(0), builder,"relation");
+
                 builder.endObject();
-
-
             builder.endArray();
         }
         builder.endObject();
@@ -742,15 +771,13 @@ public class ElasticsearchClient {
         List<UpdateRequest> updateRequests = new ArrayList<>();
         for(Node node : nodes){
 
-            String collectionCheckAttribute = null;
             QueryBuilder collectionCheckQuery = null;
             /**
-             * try it is a usage
+             * try it is a usage or proposal
              */
-            QueryBuilder queryUsage = QueryBuilders.termQuery("collections.usagedbid",node.getId());
+            QueryBuilder queryUsage = QueryBuilders.termQuery("collections.relation.dbid",node.getId());
             SearchHits searchHitsIO = this.search(INDEX_WORKSPACE,queryUsage,0,1);
             if(searchHitsIO.getTotalHits().value > 0){
-                collectionCheckAttribute = "usagedbid";
                 collectionCheckQuery = queryUsage;
             }
 
@@ -758,20 +785,21 @@ public class ElasticsearchClient {
              * try it is an collection
              */
             QueryBuilder queryCollection = QueryBuilders.termQuery("collections.dbid", node.getId());
-            if(collectionCheckAttribute == null) {
+            if(collectionCheckQuery == null) {
                 searchHitsIO = this.search(INDEX_WORKSPACE, queryCollection, 0, 1);
                 if (searchHitsIO.getTotalHits().value > 0) {
-                    collectionCheckAttribute = "dbid";
                     collectionCheckQuery = queryCollection;
                 }
             }
 
+
+
             //nothing to cleanup
-            if(collectionCheckAttribute == null){
+            if(collectionCheckQuery == null){
                 continue;
             }
-            final String checkAtt = collectionCheckAttribute;
-            logger.info("cleanup collection cause " + (collectionCheckAttribute.equals("dbid")? "collection deleted" : "usage deleted"));
+            boolean collectionDeleted = collectionCheckQuery.equals(queryCollection);
+            logger.info("cleanup collection cause " + (collectionDeleted? "collection deleted" : "usage/proposal deleted"));
             new SearchHitsRunner(this){
                 @Override
                 public void execute(SearchHit hitIO) throws IOException {
@@ -784,9 +812,15 @@ public class ElasticsearchClient {
                             for (Map<String, Object> collection : collections) {
                                 long nodeDbId = node.getId();
 
-                                Object collCeckAttValue = collection.get(checkAtt);
+                                Object collCeckAttValue = null;
+                                if(collectionDeleted){
+                                    collCeckAttValue = collection.get("dbid");
+                                }else{
+                                    collCeckAttValue = ((HashMap)collection.get("relation")).get("dbid");
+                                }
+
                                 if(collCeckAttValue == null){
-                                    logger.error("replicated collection " + collection.get("dbid") + " does not have a property " + checkAtt +" will leave it out");
+                                    logger.error("replicated collection " + collection.get("dbid") + " does not have a property to check will leave it out");
                                     continue;
                                 }
                                 long collectionAttValue = Long.parseLong(collCeckAttValue.toString());
@@ -878,10 +912,13 @@ public class ElasticsearchClient {
     private void onUpdateRefreshUsageCollectionReplicas(NodeMetadata node) throws IOException {
 
         String query = null;
+        String queryProposal = null;
         if("ccm:map".equals(node.getType())){
             query = "properties.ccm:usagecourseid.keyword";
+            queryProposal = "parentRef.id";
         }else if("ccm:io".equals(node.getType())){
             query = "properties.ccm:usageparentnodeid.keyword";
+            queryProposal = "properties.ccm:collection_proposal_target.keyword";
         }else{
             logger.info("can not handle collections for type:" + node.getType());
             return;
@@ -890,24 +927,33 @@ public class ElasticsearchClient {
         logger.info("updateing collections for " + node.getType() +" " +node.getId());
 
        //find usages for collection
-        QueryBuilder queryUsages = QueryBuilders.termQuery(query, Tools.getUUID(node.getNodeRef()));
-        new SearchHitsRunner(this){
+        QueryBuilder queryUsages = QueryBuilders.boolQuery().must(QueryBuilders.termQuery(query, Tools.getUUID(node.getNodeRef())))
+                .must(QueryBuilders.termQuery("type","ccm:usage"));
+        QueryBuilder queryProposals = ("ccm:io".equals(node.getType()))
+                ? QueryBuilders.termQuery(queryProposal, node.getNodeRef())
+                : QueryBuilders.termQuery(queryProposal, Tools.getUUID(node.getNodeRef()));
+        queryProposals = QueryBuilders.boolQuery().must(queryProposals)
+                .must(QueryBuilders.termQuery("type","ccm:collection_proposal"));
+        SearchHitsRunner shr = new SearchHitsRunner(this){
 
             @Override
             public void execute(SearchHit hit) throws IOException {
-                long usageDbId = ((Number)hit.getSourceAsMap().get("dbid")).longValue();
+                long dbId = ((Number)hit.getSourceAsMap().get("dbid")).longValue();
                 GetNodeMetadataParam param = new GetNodeMetadataParam();
-                param.setNodeIds(Arrays.asList(new Long[]{usageDbId}));
+                param.setNodeIds(Arrays.asList(new Long[]{dbId}));
                 NodeMetadatas nodeMetadatas = alfrescoClient.getNodeMetadata(param);
                 if(nodeMetadatas == null || nodeMetadatas.getNodes() == null || nodeMetadatas.getNodes().size() == 0){
-                    logger.error("could not find usage object in alfresco with dbid:" + usageDbId);
+                    logger.error("could not find usage/proposal object in alfresco with dbid:" + dbId);
                     return;
                 }
                 NodeMetadata usage = nodeMetadatas.getNodes().get(0);
-                logger.info("running indexCollections for usage: " + usageDbId);
+                logger.info("running indexCollections for usage: " + dbId);
                 indexCollections(usage);
             }
-        }.run(queryUsages);
+        };
+        shr.run(queryUsages);
+        shr.run(queryProposals);
+
     }
 
     private String getMultilangValue(List listvalue){
@@ -1255,7 +1301,6 @@ public class ElasticsearchClient {
 
                             .startObject("properties")
                                 .startObject("dbid").field("type","long").endObject()
-                                .startObject("usagedbid").field("type","long").endObject()
                                 .startObject("aclId").field("type","long").endObject()
                             .endObject()
 

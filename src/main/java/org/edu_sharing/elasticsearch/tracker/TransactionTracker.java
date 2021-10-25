@@ -196,9 +196,10 @@ public class TransactionTracker {
         logger.info("getNodeData done " +nodeData.size());
         try{
 
-            List<NodeMetadata> toIndexUsagesMd = nodeData
+            List<NodeMetadata> toIndexUsagesProposalsMd = nodeData
                     .stream()
-                    .filter(n -> "ccm:usage".equals(n.getType()))
+                    .filter(n -> "ccm:usage".equals(n.getType())
+                            || "ccm:collection_proposal".equals(n.getType()))
                     .collect(Collectors.toList());
 
             List<NodeMetadata> toIndexMd = new ArrayList<>();
@@ -253,7 +254,7 @@ public class TransactionTracker {
                 logger.error(nodeData.stream().map(NodeMetadata::getNodeRef).collect(Collectors.joining(", ")));
             }
 
-            logger.info("final usable: " + toIndexUsagesMd.size() + " " + toIndex.size());
+            logger.info("final usable: " + toIndexUsagesProposalsMd.size() + " " + toIndex.size());
 
             elasticClient.beforeDeleteCleanupCollectionReplicas(toDelete);
             elasticClient.delete(toDelete);
@@ -285,7 +286,7 @@ public class TransactionTracker {
              * refresh index so that collections will be found by cacheCollections process
              */
             elasticClient.refresh(ElasticsearchClient.INDEX_WORKSPACE);
-            for(NodeMetadata usage : toIndexUsagesMd) elasticClient.indexCollections(usage);
+            for(NodeMetadata usage : toIndexUsagesProposalsMd) elasticClient.indexCollections(usage);
 
             //remember for the next start of tracker
             elasticClient.setTransaction(lastFromCommitTime,transactionIds.get(transactionIds.size() - 1));
